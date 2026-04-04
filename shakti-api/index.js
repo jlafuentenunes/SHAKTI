@@ -137,7 +137,43 @@ app.post('/api/bookings', async (req, res) => {
   }
 });
 
+app.get('/api/bookings/busy', async (req, res) => {
+  const { date } = req.query;
+  if (!date) return res.status(400).json({ error: 'Data não fornecida' });
+
+  try {
+    const connection = await mysql.createConnection(dbConfig);
+    const [rows] = await connection.execute(
+      'SELECT booking_time FROM appointments WHERE booking_date = ? AND status != "cancelled"',
+      [date]
+    );
+    await connection.end();
+    
+    // Return an array of strings e.g. ["09:00", "10:30"]
+    const busyTimes = rows.map(r => r.booking_time);
+    res.json(busyTimes);
+  } catch (error) {
+    res.status(500).json({ success: false, error: error.message });
+  }
+});
+
+// Admin Login
+app.post('/api/login', (req, res) => {
+  const { user, password } = req.body;
+  if (user === (process.env.ADMIN_USER || 'admin') && 
+      password === (process.env.ADMIN_PASS || 'shakti2026')) {
+    res.json({ success: true, token: 'fake-jwt-shakti' });
+  } else {
+    res.status(401).json({ success: false, message: 'Credenciais inválidas' });
+  }
+});
+
 app.get('/api/bookings', async (req, res) => {
+  const auth = req.headers.authorization;
+  if (auth !== 'fake-jwt-shakti') {
+    return res.status(403).json({ success: false, message: 'Não autorizado' });
+  }
+  
   try {
     const connection = await mysql.createConnection(dbConfig);
     const [rows] = await connection.execute('SELECT * FROM appointments ORDER BY created_at DESC');

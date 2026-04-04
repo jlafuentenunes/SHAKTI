@@ -70,13 +70,75 @@ function App() {
     date: '2026-04-05',
     time: ''
   });
+  const [view, setView] = useState('client'); // 'client' or 'admin'
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [busySlots, setBusySlots] = useState([]);
+  const [appointments, setAppointments] = useState([]);
+  const [isLoggedIn, setIsLoggedIn] = useState(!!localStorage.getItem('shakti-token'));
+  const [loginForm, setLoginForm] = useState({ user: '', password: '' });
+
   const [contactForm, setContactForm] = useState({
     name: '',
     email: '',
     subject: 'Informações Gerais',
     message: ''
   });
+
+  const fetchAppointments = async () => {
+    try {
+      const response = await fetch('/api/bookings', {
+        headers: { 'Authorization': localStorage.getItem('shakti-token') }
+      });
+      const data = await response.json();
+      if (Array.isArray(data)) setAppointments(data);
+    } catch (err) {
+      console.error("Error fetching bookings:", err);
+    }
+  };
+
+  useEffect(() => {
+    if (view === 'admin' && isLoggedIn) {
+      fetchAppointments();
+    }
+  }, [view, isLoggedIn]);
+
+  const handleLogin = async (e) => {
+    e.preventDefault();
+    setIsSubmitting(true);
+    try {
+      const res = await fetch('/api/login', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(loginForm)
+      });
+      const data = await res.json();
+      if (data.success) {
+        localStorage.setItem('shakti-token', data.token);
+        setIsLoggedIn(true);
+      } else {
+        alert(data.message);
+      }
+    } catch (err) {
+      alert('Erro ao fazer login');
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
+  const handleLogout = () => {
+    localStorage.removeItem('shakti-token');
+    setIsLoggedIn(false);
+    setView('client');
+  };
+
+  useEffect(() => {
+    if (bookingStep === 2 && formData.date) {
+      fetch(`/api/bookings/busy?date=${formData.date}`)
+        .then(res => res.json())
+        .then(data => setBusySlots(Array.isArray(data) ? data : []))
+        .catch(err => console.error("Error fetching slots:", err));
+    }
+  }, [formData.date, bookingStep]);
 
   useEffect(() => {
     const handleScroll = () => setScrolled(window.scrollY > 50);
@@ -146,6 +208,71 @@ function App() {
       setIsSubmitting(false);
     }
   };
+
+  if (view === 'admin') {
+    return (
+      <div className="admin-container">
+        {!isLoggedIn ? (
+          <div className="admin-login-box">
+            <h2>Shakti Admin Login</h2>
+            <form onSubmit={handleLogin}>
+              <div className="form-group">
+                <label>Utilizador</label>
+                <input type="text" className="input-field" value={loginForm.user} onChange={e => setLoginForm({...loginForm, user: e.target.value})} />
+              </div>
+              <div className="form-group">
+                <label>Palavra-passe</label>
+                <input type="password" className="input-field" value={loginForm.password} onChange={e => setLoginForm({...loginForm, password: e.target.value})} />
+              </div>
+              <button className="btn-primary w-full" disabled={isSubmitting}>Entrar</button>
+              <button type="button" className="btn-secondary w-full mt-2" onClick={() => setView('client')}>Sair para o Site</button>
+            </form>
+          </div>
+        ) : (
+          <div className="admin-dashboard">
+            <header className="admin-header">
+              <h1>Painel de Reservas</h1>
+              <div className="admin-actions">
+                <button className="btn-secondary" onClick={fetchAppointments}>Atualizar</button>
+                <button className="btn-primary" onClick={handleLogout}>Sair</button>
+              </div>
+            </header>
+            <div className="admin-stats mt-4">
+              <div className="admin-stat-card">
+                <h3>Total</h3>
+                <p>{appointments.length}</p>
+              </div>
+            </div>
+            <div className="admin-table-container mt-4">
+              <table className="admin-table">
+                <thead>
+                  <tr>
+                    <th>Data/Hora</th>
+                    <th>Cliente</th>
+                    <th>Serviço</th>
+                    <th>Status</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {appointments.map(a => (
+                    <tr key={a.id}>
+                      <td>{a.booking_date} às {a.booking_time}</td>
+                      <td>
+                        <strong>{a.customer_name}</strong><br/>
+                        <small>{a.customer_email}</small>
+                      </td>
+                      <td>{a.service_name}</td>
+                      <td><span className={`status-badge ${a.status}`}>{a.status}</span></td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        )}
+      </div>
+    );
+  }
 
   return (
     <div className="app">
@@ -378,19 +505,33 @@ function App() {
             {bookingStep === 2 && (
               <div className="step-content">
                 <h3>Data e Hora</h3>
-                <div className="calendar-mockup">
-                  <Calendar size={48} strokeWidth={1} />
-                  <p>Selecione um dia disponível</p>
+                <div className="calendar-selection">
+                  <div className="date-input-wrapper">
+                    <label>Selecione o Dia:</label>
+                    <input 
+                      type="date" 
+                      className="input-field"
+                      min={new Date().toISOString().split('T')[0]}
+                      value={formData.date}
+                      onChange={(e) => setFormData(prev => ({ ...prev, date: e.target.value, time: '' }))}
+                    />
+                  </div>
+                  <p className="mt-4">Horários Disponíveis:</p>
                   <div className="time-grid">
-                    {['09:00', '10:30', '14:00', '16:00'].map(t => (
-                      <button 
-                        key={t} 
-                        className={`time-btn ${formData.time === t ? 'selected' : ''}`}
-                        onClick={() => setFormData(prev => ({ ...prev, time: t }))}
-                      >
-                        {t}
-                      </button>
-                    ))}
+                    {['09:00', '10:30', '12:00', '14:00', '15:30', '17:00', '18:30'].map(t => {
+                      const isBusy = busySlots.includes(t);
+                      return (
+                        <button 
+                          key={t} 
+                          disabled={isBusy}
+                          className={`time-btn ${formData.time === t ? 'selected' : ''} ${isBusy ? 'busy' : ''}`}
+                          onClick={() => setFormData(prev => ({ ...prev, time: t }))}
+                        >
+                          {t}
+                          {isBusy && <span className="busy-tag">Ocupado</span>}
+                        </button>
+                      );
+                    })}
                   </div>
                 </div>
                 <div className="modal-footer">
@@ -465,6 +606,7 @@ function App() {
         </div>
         <div className="footer-bottom">
           <p>© 2026 Shakti Home. Todos os direitos reservados.</p>
+          <button className="admin-access-btn" onClick={() => setView('admin')}>Admin Portal</button>
         </div>
       </footer>
     </div>
