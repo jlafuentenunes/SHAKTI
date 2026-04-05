@@ -1,0 +1,45 @@
+nohup: a ignorar a entrada
+
+> shakti@0.0.0 dev
+> vite --port 5175 --host
+
+
+  VITE v8.0.3  ready in 245 ms
+
+  ➜  Local:   http://localhost:5175/
+  ➜  Network: http://192.168.33.30:5175/
+  ➜  Network: http://172.17.0.1:5175/
+11:13:54 [vite] (client) [Unhandled error] Error: Script error.
+ > ../../../../@vite/client:516:55
+
+11:14:21 [vite] (client) [Unhandled error] Error: Script error.
+ > ../../../../@vite/client:516:55
+
+11:14:21 [vite] (client) [Unhandled error] Error: Script error.
+ > ../../../../@vite/client:516:55
+
+11:15:00 [vite] (client) [Unhandled error] Error: Script error.
+ > ../../../../@vite/client:516:55
+
+11:17:02 [vite] (client) hmr update /src/App.jsx
+11:17:32 [vite] (client) hmr update /src/App.jsx
+11:17:45 [vite] (client) hmr update /src/App.css
+11:23:02 [vite] (client) hmr update /src/App.jsx
+11:23:11 [vite] (client) hmr update /src/App.jsx
+11:23:31 [vite] (client) hmr update /src/App.jsx
+11:23:38 [vite] (client) hmr update /src/App.jsx
+11:23:57 [vite] (client) hmr update /src/App.jsx
+11:24:06 [vite] (client) hmr update /src/App.jsx
+11:24:15 [vite] (client) hmr update /src/App.css
+11:26:25 [vite] (client) hmr update /src/App.jsx
+11:26:46 [vite] (client) hmr update /src/App.jsx
+11:27:00 [vite] (client) hmr update /src/App.jsx
+11:27:07 [vite] (client) hmr update /src/App.css
+11:31:16 [vite] (client) [Unhandled error] Error: Script error.
+ > ../../../../@vite/client:516:55
+
+11:31:17 [vite] (client) [Unhandled error] Error: Script error.
+ > ../../../../@vite/client:516:55
+
+11:31:23 [vite] (client) [console.error] Error fetching techs: SyntaxError: Unexpected token '<', "<!DOCTYPE "... is not valid JSON
+11:31:23 [vite] (client) [console.error] Error fetching blockouts: SyntaxError: Unexpected token '<', "<!DOCTYPE "... is not valid JSON

@@ -1,0 +1,43 @@
+
+> shakti-api@1.0.0 dev
+> nodemon index.js
+
+[33m[nodemon] 3.1.14[39m
+[33m[nodemon] to restart at any time, enter `rs`[39m
+[33m[nodemon] watching path(s): *.*[39m
+[33m[nodemon] watching extensions: js,mjs,cjs,json[39m
+[32m[nodemon] starting `node index.js`[39m
+◇ injecting env (8) from .env // tip: ⌘ enable debugging { debug: true }
+Server running on port 3001
+Connected to MySQL
+Database tables ready
+[32m[nodemon] clean exit - waiting for changes before restart[39m
+[32m[nodemon] restarting child process[39m
+[32m[nodemon] starting `node index.js`[39m
+[32m[nodemon] restarting due to changes...[39m
+
+  #  Node.js[10078]: void node::ResetStdio() at ../src/node.cc:751
+  #  Assertion failed: !(err != 0) || (err == -1 && (*__errno_location ()) == 1)
+
+----- Native stack trace -----
+
+ 1: 0x560646122001 node::Assert(node::AssertionInfo const&) [node]
+ 2: 0x5606460c953e  [node]
+ 3: 0x7f8af6a41e7d  [/lib64/libc.so.6]
+ 4: 0x7f8af6a41fd0  [/lib64/libc.so.6]
+ 5: 0x560646022023 node::DefaultProcessExitHandlerInternal(node::Environment*, node::ExitCode) [node]
+ 6: 0x560646084838 node::Environment::Exit(node::ExitCode) [node]
+ 7: 0x5606463cc196  [node]
+ 8: 0x5606463ccd35 v8::internal::Builtin_HandleApiCall(int, unsigned long*, v8::internal::Isolate*) [node]
+ 9: 0x560646d361b6  [node]
+
+  #  Node.js[10078]: void node::ResetStdio() at ../src/node.cc:751
+  #  Assertion failed: !(err != 0) || (err == -1 && (*__errno_location ()) == 1)
+
+----- Native stack trace -----
+
+ 1: 0x560646122001 node::Assert(node::AssertionInfo const&) [node]
+ 2: 0x5606460c953e  [node]
+ 3: 0x5606460c9907 node::TrapWebAssemblyOrContinue(int, siginfo_t*, void*) [node]
+ 4: 0x7f8af6a3fc30  [/lib64/libc.so.6]
+ 5: 0x7f8af6bfb1f0  [/lib64/libc.so.6]

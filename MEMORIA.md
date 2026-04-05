@@ -30,13 +30,15 @@ Transformar a **Shakti Home** (Apúlia Coast Wellness) num refúgio digital de b
 - [ ] O utilizador deve preencher a password no ficheiro `shakti-api/.env` para ativar o envio real.
 
 ### 2. Painel de Administração (Backoffice)
-- [ ] Criar uma rota segura `/admin` para visualização das marcações.
-- [ ] Implementar login para o administrador.
-- [ ] Funcionalidade para o administrador confirmar ou cancelar marcações.
+- [x] Criar uma rota segura `/admin` para visualização das marcações.
+- [x] Implementar login para o administrador.
+- [x] Funcionalidade para o administrador confirmar ou cancelar marcações.
+- [x] Estatísticas rápidas no dashboard.
 
 ### 3. Gestão de Disponibilidade
-- [ ] Tornar os horários do modal dinâmicos (bloquear horas já ocupadas).
-- [ ] Calendário para os técnicos verem os seus serviços.
+- [x] Tornar os horários do modal dinâmicos (bloquear horas já ocupadas).
+- [x] Bloqueio de marcações duplicadas no backend.
+- [x] Calendário para os técnicos verem os seus serviços.
 
 ### 4. Pagamentos (Opcional)
 - [ ] Estudar integração de MBWAY/Stripe para pré-reservas.

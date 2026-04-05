@@ -1,0 +1,18 @@
+nohup: a ignorar a entrada
+◇ injecting env (8) from .env // tip: ⌁ auth for agents [www.vestauth.com]
+Server running on port 3001
+Connected to MySQL
+Database tables ready
+2026-04-05T10:14:36.242Z - POST /api/login
+Login attempt for user: Admin
+Login failed: invalid credentials
+2026-04-05T10:15:19.429Z - POST /api/login
+Login attempt for user: admnin
+Login failed: invalid credentials
+2026-04-05T10:15:29.101Z - POST /api/login
+Login attempt for user: admin
+Login success
+2026-04-05T10:15:29.234Z - GET /api/bookings
+2026-04-05T10:31:22.951Z - GET /api/technicians
+2026-04-05T10:31:22.957Z - GET /api/bookings
+2026-04-05T10:31:22.961Z - GET /api/blockouts
