@@ -88,6 +88,7 @@ async function initDB() {
         checklist JSON DEFAULT NULL,
         promo_discount INT DEFAULT 10,
         promo_validity INT DEFAULT 60,
+        deleted_at DATETIME DEFAULT NULL,
         created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
       )
     `);
@@ -464,9 +465,21 @@ app.listen(PORT, async () => {
 });
 
 app.get('/api/services', async (req, res) => {
+  const { search, showDeleted } = req.query;
   try {
     const connection = await mysql.createConnection(dbConfig);
-    const [rows] = await connection.execute('SELECT * FROM services');
+    let query = 'SELECT * FROM services WHERE 1=1';
+    let params = [];
+
+    if (showDeleted !== 'true') {
+      query += ' AND deleted_at IS NULL';
+    }
+    if (search) {
+      query += ' AND name LIKE ?';
+      params.push(`%${search}%`);
+    }
+
+    const [rows] = await connection.execute(query, params);
     await connection.end();
     res.json(rows);
   } catch (error) {
@@ -666,6 +679,71 @@ app.post('/api/vouchers/promote-empty', async (req, res) => {
 
     await connection.end();
     res.json({ success: true, message: `Slot de ${time} promovido para ${regulars.length} clientes!` });
+  } catch (error) {
+    res.status(500).json({ success: false, error: error.message });
+  }
+});
+
+// Create new service
+app.post('/api/services', async (req, res) => {
+  const auth = req.headers.authorization || '';
+  if (auth !== 'fake-jwt-shakti-admin') {
+    return res.status(403).json({ success: false, message: 'Dedicado apenas ao Administrador' });
+  }
+  const { name, duration, price, category, technician_id } = req.body;
+  try {
+    const connection = await mysql.createConnection(dbConfig);
+    const [result] = await connection.execute(
+      'INSERT INTO services (name, duration, price, category, technician_id, checklist) VALUES (?, ?, ?, ?, ?, ?)',
+      [name, duration, price, category, technician_id, JSON.stringify([])]
+    );
+    await connection.end();
+    res.json({ success: true, id: result.insertId, message: 'Serviço criado com sucesso!' });
+  } catch (error) {
+    res.status(500).json({ success: false, error: error.message });
+  }
+});
+
+// Soft Delete service
+app.delete('/api/services/:id', async (req, res) => {
+  const auth = req.headers.authorization || '';
+  if (auth !== 'fake-jwt-shakti-admin') return res.status(403).json({ success: false, message: 'Não autorizado' });
+  const { id } = req.params;
+  try {
+    const connection = await mysql.createConnection(dbConfig);
+    await connection.execute('UPDATE services SET deleted_at = NOW() WHERE id = ?', [id]);
+    await connection.end();
+    res.json({ success: true, message: 'Serviço removido (Soft Delete)' });
+  } catch (error) {
+    res.status(500).json({ success: false, error: error.message });
+  }
+});
+
+// Restore deleted service
+app.post('/api/services/:id/restore', async (req, res) => {
+  const auth = req.headers.authorization || '';
+  if (auth !== 'fake-jwt-shakti-admin') return res.status(403).json({ success: false, message: 'Não autorizado' });
+  const { id } = req.params;
+  try {
+    const connection = await mysql.createConnection(dbConfig);
+    await connection.execute('UPDATE services SET deleted_at = NULL WHERE id = ?', [id]);
+    await connection.end();
+    res.json({ success: true, message: 'Serviço restaurado!' });
+  } catch (error) {
+    res.status(500).json({ success: false, error: error.message });
+  }
+});
+
+// Hard Delete service
+app.delete('/api/services/:id/permanent', async (req, res) => {
+  const auth = req.headers.authorization || '';
+  if (auth !== 'fake-jwt-shakti-admin') return res.status(403).json({ success: false, message: 'Não autorizado' });
+  const { id } = req.params;
+  try {
+    const connection = await mysql.createConnection(dbConfig);
+    await connection.execute('DELETE FROM services WHERE id = ?', [id]);
+    await connection.end();
+    res.json({ success: true, message: 'Serviço eliminado definitivamente.' });
   } catch (error) {
     res.status(500).json({ success: false, error: error.message });
   }
