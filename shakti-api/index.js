@@ -123,6 +123,18 @@ async function initDB() {
       )
     `);
 
+    await connection.query(`
+      CREATE TABLE IF NOT EXISTS customers (
+        id INT AUTO_INCREMENT PRIMARY KEY,
+        name VARCHAR(255) NOT NULL,
+        email VARCHAR(255) UNIQUE NOT NULL,
+        phone VARCHAR(50),
+        birthday DATE,
+        anamnesis JSON DEFAULT NULL,
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+      )
+    `);
+
     console.log('Database tables ready');
     await connection.end();
   } catch (error) {
@@ -907,3 +919,65 @@ app.get('/api/reports/stats', async (req, res) => {
     res.status(500).json({ success: false, error: error.message });
   }
 });
+
+// CRM Endpoints (Search, List, Patch) already implemented below
+
+// CRM: Customers Endpoints
+app.get('/api/customers', async (req, res) => {
+  const { search } = req.query;
+  try {
+    const connection = await mysql.createConnection(dbConfig);
+    let query = `
+      SELECT c.*, 
+        (SELECT COUNT(*) FROM appointments WHERE customer_email = c.email AND status = 'confirmed') as total_bookings,
+        (SELECT MAX(booking_date) FROM appointments WHERE customer_email = c.email AND status = 'confirmed') as last_visit,
+        (SELECT SUM(CAST(REPLACE(s.price, '€', '') AS DECIMAL)) 
+         FROM appointments a 
+         JOIN services s ON a.service_name = s.name 
+         WHERE a.customer_email = c.email AND a.status = 'confirmed') as total_spent
+      FROM customers c
+    `;
+    let params = [];
+    if (search) {
+      query += ' WHERE c.name LIKE ? OR c.email LIKE ?';
+      params = [`%${search}%`, `%${search}%` ];
+    }
+    const [rows] = await connection.execute(query, params);
+    await connection.end();
+    res.json(rows);
+  } catch (error) {
+    res.status(500).json({ success: false, error: error.message });
+  }
+});
+
+app.patch('/api/customers/:id', async (req, res) => {
+  const { id } = req.params;
+  const { birthday, anamnesis } = req.body;
+  try {
+    const connection = await mysql.createConnection(dbConfig);
+    if (birthday !== undefined) {
+      await connection.execute('UPDATE customers SET birthday = ? WHERE id = ?', [birthday, id]);
+    }
+    if (anamnesis !== undefined) {
+      await connection.execute('UPDATE customers SET anamnesis = ? WHERE id = ?', [JSON.stringify(anamnesis), id]);
+    }
+    await connection.end();
+    res.json({ success: true, message: 'Ficha de cliente atualizada.' });
+  } catch (error) {
+    res.status(500).json({ success: false, error: error.message });
+  }
+});
+
+// Auto-register customer from booking if they don't exist
+const syncCustomersFromBookings = async () => {
+    try {
+        const connection = await mysql.createConnection(dbConfig);
+        await connection.execute(`
+            INSERT IGNORE INTO customers (name, email, phone)
+            SELECT DISTINCT customer_name, customer_email, customer_phone
+            FROM appointments
+        `);
+        await connection.end();
+    } catch (e) { console.error("Sync customers err:", e); }
+};
+syncCustomersFromBookings();

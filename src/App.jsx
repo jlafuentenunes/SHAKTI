@@ -95,6 +95,9 @@ function App() {
   const [blockouts, setBlockouts] = useState([]);
   const [reports, setReports] = useState(null);
   const [reportRange, setReportRange] = useState({ start: '', end: '' });
+  const [customers, setCustomers] = useState([]);
+  const [selectedCustomer, setSelectedCustomer] = useState(null);
+  const [customerSearch, setCustomerSearch] = useState('');
   const [settings, setSettings] = useState({ calendar_start: '09:00', calendar_end: '19:00', slot_duration: 90 });
   const [selectedCalendarTechId, setSelectedCalendarTechId] = useState(null);
   const [isMobile, setIsMobile] = useState(window.innerWidth <= 768);
@@ -276,6 +279,29 @@ function App() {
   useEffect(() => {
     if (adminTab === 'reports') fetchReports();
   }, [adminTab, reportRange]);
+
+  const fetchCustomers = async () => {
+    try {
+      const res = await fetch(`/api/customers?search=${customerSearch}`);
+      const data = await res.json();
+      if (Array.isArray(data)) setCustomers(data);
+    } catch (e) { console.error("Customers err:", e); }
+  };
+
+  useEffect(() => {
+    if (adminTab === 'customers') fetchCustomers();
+  }, [adminTab, customerSearch]);
+
+  const updateCustomer = async (id, data) => {
+    try {
+      const res = await fetch(`/api/customers/${id}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json', 'Authorization': 'fake-jwt-shakti-admin' },
+        body: JSON.stringify(data)
+      });
+      if ((await res.json()).success) { notify('Atualizado', 'Ficha guardada.'); fetchCustomers(); }
+    } catch (e) { notify('Erro', 'Erro ao guardar.', 'error'); }
+  };
 
   const createService = async (serviceData) => {
     try {
@@ -566,6 +592,16 @@ function App() {
                   </button>
                 )}
                 {userRole === 'admin' && (
+                  <button className={`side-btn ${adminTab === 'customers' ? 'active' : ''}`} onClick={() => setAdminTab('customers')}>
+                    <Users size={20} /> <span>Clientes</span>
+                  </button>
+                )}
+                {userRole === 'admin' && (
+                  <button className={`side-btn ${adminTab === 'reports' ? 'active' : ''}`} onClick={() => setAdminTab('reports')}>
+                    <BarChart2 size={20} /> <span>Relatórios</span>
+                  </button>
+                )}
+                {userRole === 'admin' && (
                   <button className={`side-btn ${adminTab === 'settings' ? 'active' : ''}`} onClick={() => setAdminTab('settings')}>
                     <Settings size={20} /> <span>Definições</span>
                   </button>
@@ -585,7 +621,9 @@ function App() {
               <header className="admin-page-header">
                 <h1>{adminTab === 'table' ? 'Gestão de Reservas' : 
                      adminTab === 'calendar' ? 'Calendário de Estúdio' : 
-                     adminTab === 'technicians' ? 'Gestão de Talentos' : 'Configurações'}</h1>
+                     adminTab === 'technicians' ? 'Gestão de Talentos' : 
+                     adminTab === 'customers' ? 'Histórico de Clientes' : 
+                     adminTab === 'reports' ? 'Performance de Negócio' : 'Configurações'}</h1>
                 <p className="subtitle">Bons tratamentos, {userRole === 'admin' ? 'Administrador' : technicians.find(t => t.id == userTechId)?.name || 'Técnico'}.</p>
               </header>
 
@@ -1025,6 +1063,181 @@ function App() {
                         ))}
                       </div>
                     </div>
+                  </div>
+                )}
+
+                {adminTab === 'customers' && (
+                  <div className="customers-layout animate-in">
+                    <div className="admin-page-header">
+                      <h1>Gestão de Clientes (CRM)</h1>
+                      <div className="header-actions">
+                        <div className="search-box-v3">
+                          <input 
+                            type="text" 
+                            placeholder="Pesquisar por nome ou email..." 
+                            className="glass-input"
+                            value={customerSearch}
+                            onChange={(e) => setCustomerSearch(e.target.value)}
+                          />
+                        </div>
+                      </div>
+                    </div>
+
+                    <div className="bento-grid">
+                      {customers.map(c => (
+                        <div key={c.id} className="bento-card glass-effect customer-card" style={{ cursor: 'pointer', transition: 'transform 0.3s' }} onClick={() => setSelectedCustomer(c)}>
+                          <div className="customer-header" style={{ display: 'flex', gap: '15px', alignItems: 'center' }}>
+                            <div className="avatar-med" style={{ width: '45px', height: '45px', borderRadius: '50%', background: 'var(--primary)', color: 'white', display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 800 }}>{c.name[0]}</div>
+                            <div>
+                               <h3 style={{ margin: 0, fontSize: '1rem' }}>{c.name}</h3>
+                               <p style={{ margin: 0, opacity: 0.6, fontSize: '0.8rem' }}>{c.email}</p>
+                            </div>
+                          </div>
+                          <div className="customer-mini-stats mt-4" style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.75rem', opacity: 0.8 }}>
+                             <div><strong>{c.total_bookings}</strong> visitas</div>
+                             <div><strong>{c.total_spent || 0}€</strong> total</div>
+                             <div>Última: {c.last_visit ? new Date(c.last_visit).toLocaleDateString() : 'N/A'}</div>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+
+                    {/* Customer Profile Modal */}
+                    {selectedCustomer && (
+                      <div className="modal-overlay">
+                        <div className="modal-content profile-modal animate" style={{ maxWidth: '900px', padding: '0', background: 'white', borderRadius: '30px', overflow: 'hidden' }}>
+                          <div className="profile-header" style={{ background: 'var(--primary)', color: 'white', padding: '40px', position: 'relative' }}>
+                            <div style={{ display: 'flex', gap: '30px', alignItems: 'center' }}>
+                              <div className="avatar-large" style={{ width: '100px', height: '100px', borderRadius: '50%', background: 'white', color: 'var(--primary)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '2.5rem', fontWeight: 900 }}>{selectedCustomer.name[0]}</div>
+                              <div className="profile-main-info">
+                                 <h2 style={{ margin: 0, fontSize: '2rem' }}>{selectedCustomer.name}</h2>
+                                 <p style={{ margin: '5px 0', opacity: 0.8 }}>{selectedCustomer.email} • {selectedCustomer.phone}</p>
+                                 <div className="chips-row" style={{ display: 'flex', gap: '10px', marginTop: '15px' }}>
+                                   <span className="chip" style={{ background: 'rgba(255,255,255,0.2)', padding: '5px 12px', borderRadius: '20px', fontSize: '0.75rem' }}>Cliente desde {new Date(selectedCustomer.created_at).toLocaleDateString()}</span>
+                                   <span className="chip highlight" style={{ background: 'white', color: 'var(--primary)', padding: '5px 12px', borderRadius: '20px', fontSize: '0.75rem', fontWeight: 700 }}>VERIFICADO</span>
+                                 </div>
+                              </div>
+                            </div>
+                            <X className="close-profile" style={{ position: 'absolute', top: '25px', right: '25px', cursor: 'pointer', opacity: 0.7 }} onClick={() => setSelectedCustomer(null)} />
+                          </div>
+
+                          <div className="profile-body" style={{ display: 'grid', gridTemplateColumns: '1fr 2fr' }}>
+                            <div className="profile-sidebar" style={{ padding: '30px', borderRight: '1px solid #eee' }}>
+                              <div className="sidebar-group">
+                                <label style={{ fontSize: '0.75rem', fontWeight: 700, display: 'block', marginBottom: '8px' }}>Data de Aniversário</label>
+                                <input 
+                                  type="date" 
+                                  className="glass-input" 
+                                  defaultValue={selectedCustomer.birthday ? selectedCustomer.birthday.slice(0, 10) : ''}
+                                  onBlur={(e) => updateCustomer(selectedCustomer.id, { birthday: e.target.value })}
+                                />
+                                <p style={{ fontSize: '0.65rem', margin: '5px 0', opacity: 0.6 }}>Ideal para campanhas de bday.</p>
+                              </div>
+                              
+                              <div className="sidebar-group mt-10">
+                                <h3 style={{ fontSize: '0.9rem', marginBottom: '15px' }}>Histórico de Tratamentos</h3>
+                                <div className="mini-timeline" style={{ borderLeft: '2px solid #eee', paddingLeft: '20px', marginLeft: '5px' }}>
+                                  {appointments.filter(a => a.customer_email === selectedCustomer.email).slice(0, 5).map(a => (
+                                    <div key={a.id} className="timeline-item" style={{ position: 'relative', paddingBottom: '20px' }}>
+                                      <div className="dot" style={{ position: 'absolute', left: '-27px', top: '5px', width: '12px', height: '12px', borderRadius: '50%', background: a.status === 'confirmed' ? 'var(--primary)' : '#ccc' }}></div>
+                                      <div className="tl-content">
+                                        <strong style={{ display: 'block', fontSize: '0.85rem' }}>{a.service_name}</strong>
+                                        <p style={{ fontSize: '0.7rem', margin: '2px 0', opacity: 0.6 }}>{new Date(a.booking_date).toLocaleDateString()} • {a.status}</p>
+                                      </div>
+                                    </div>
+                                  ))}
+                                  {appointments.filter(a => a.customer_email === selectedCustomer.email).length === 0 && <p style={{ fontSize: '0.7rem', opacity: 0.5 }}>Sem histórico registado.</p>}
+                                </div>
+                              </div>
+                            </div>
+
+                            <div className="profile-main-content" style={{ padding: '40px' }}>
+                               <div className="anamnesis-section">
+                                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '25px' }}>
+                                    <h3 style={{ margin: 0, fontSize: '1.2rem' }}>Anamnese Detalhada (Saúde)</h3>
+                                    <span style={{ fontSize: '0.65rem', color: 'var(--primary)', fontWeight: 800, letterSpacing: '1px' }}>CONFIDENCIAL • RGPD</span>
+                                 </div>
+                                 
+                                 {(() => {
+                                   let ana = { clinico: '', alergias: '', medicamentos: '', zonas: '', estilo: '', stress: 5 };
+                                   try {
+                                     ana = selectedCustomer.anamnesis ? (typeof selectedCustomer.anamnesis === 'string' ? JSON.parse(selectedCustomer.anamnesis) : selectedCustomer.anamnesis) : ana;
+                                   } catch(e) { console.error(e); }
+                                   
+                                   return (
+                                     <div className="anamnesis-grid" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '30px' }}>
+                                       <div className="ana-field">
+                                         <label style={{ display: 'block', fontWeight: 700, fontSize: '0.8rem', marginBottom: '8px' }}>☢️ Histórico Clínico / Cirurgias</label>
+                                         <textarea 
+                                          style={{ width: '100%', height: '80px', padding: '12px', borderRadius: '15px', border: '1px solid #ddd', fontSize: '0.8rem', resize: 'none' }}
+                                          defaultValue={ana.clinico} 
+                                          onBlur={(e) => {
+                                            const newAna = { ...ana, clinico: e.target.value };
+                                            updateCustomer(selectedCustomer.id, { anamnesis: newAna });
+                                          }} 
+                                          placeholder="Ex: Prótese anca, Diabetes..." 
+                                         />
+                                       </div>
+                                       <div className="ana-field">
+                                         <label style={{ display: 'block', fontWeight: 700, fontSize: '0.8rem', marginBottom: '8px' }}>⚠️ Alergias e Hipersensibilidade</label>
+                                         <textarea 
+                                          style={{ width: '100%', height: '80px', padding: '12px', borderRadius: '15px', border: '1px solid #ddd', fontSize: '0.8rem', resize: 'none' }}
+                                          defaultValue={ana.alergias} 
+                                          onBlur={(e) => {
+                                            const newAna = { ...ana, alergias: e.target.value };
+                                            updateCustomer(selectedCustomer.id, { anamnesis: newAna });
+                                          }} 
+                                          placeholder="Ex: Alergia a Frutos Secos (Óleo amêndoa)..." 
+                                         />
+                                       </div>
+                                       <div className="ana-field">
+                                         <label style={{ display: 'block', fontWeight: 700, fontSize: '0.8rem', marginBottom: '8px' }}>🧘 Estilo de Vida e Hábitos</label>
+                                         <textarea 
+                                          style={{ width: '100%', height: '80px', padding: '12px', borderRadius: '15px', border: '1px solid #ddd', fontSize: '0.8rem', resize: 'none' }}
+                                          defaultValue={ana.estilo} 
+                                          onBlur={(e) => {
+                                            const newAna = { ...ana, estilo: e.target.value };
+                                            updateCustomer(selectedCustomer.id, { anamnesis: newAna });
+                                          }} 
+                                          placeholder="Ex: Pratica desporto 3x/semana, dieta vegetariana..." 
+                                         />
+                                       </div>
+                                       <div className="ana-field">
+                                         <label style={{ display: 'block', fontWeight: 700, fontSize: '0.8rem', marginBottom: '8px' }}>⚡ Nível de Stress (1-10)</label>
+                                         <div style={{ display: 'flex', gap: '15px', alignItems: 'center', background: '#f9f9f9', padding: '15px', borderRadius: '15px' }}>
+                                           <input 
+                                              type="range" min="1" max="10" 
+                                              defaultValue={ana.stress || 5} 
+                                              onChange={(e) => {
+                                                const newAna = { ...ana, stress: e.target.value };
+                                                updateCustomer(selectedCustomer.id, { anamnesis: newAna });
+                                              }} 
+                                              style={{ flex: 1, accentColor: 'var(--primary)' }}
+                                           />
+                                           <span style={{ fontWeight: 800, fontSize: '1.2rem', color: 'var(--primary)' }}>{ana.stress || 5}</span>
+                                         </div>
+                                       </div>
+                                       <div className="ana-field" style={{ gridColumn: 'span 2' }}>
+                                         <label style={{ display: 'block', fontWeight: 700, fontSize: '0.8rem', marginBottom: '8px' }}>📍 Zonas de Cuidado / Notas Extra</label>
+                                         <textarea 
+                                          style={{ width: '100%', height: '60px', padding: '12px', borderRadius: '15px', border: '1px solid #ddd', fontSize: '0.8rem', resize: 'none' }}
+                                          defaultValue={ana.zonas} 
+                                          onBlur={(e) => {
+                                            const newAna = { ...ana, zonas: e.target.value };
+                                            updateCustomer(selectedCustomer.id, { anamnesis: newAna });
+                                          }} 
+                                          placeholder="Ex: Muita sensibilidade nos pés, Dor lombar L4..." 
+                                         />
+                                       </div>
+                                     </div>
+                                   );
+                                 })()}
+                               </div>
+                            </div>
+                          </div>
+                        </div>
+                      </div>
+                    )}
                   </div>
                 )}
 
