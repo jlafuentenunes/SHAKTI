@@ -88,6 +88,7 @@ async function initDB() {
         checklist JSON DEFAULT NULL,
         promo_discount INT DEFAULT 10,
         promo_validity INT DEFAULT 60,
+        vouchers_enabled BOOLEAN DEFAULT TRUE,
         deleted_at DATETIME DEFAULT NULL,
         created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
       )
@@ -110,11 +111,14 @@ async function initDB() {
     await connection.query(`
       CREATE TABLE IF NOT EXISTS vouchers (
         id INT AUTO_INCREMENT PRIMARY KEY,
-        code VARCHAR(50) UNIQUE NOT NULL,
+        code VARCHAR(50) NOT NULL,
         discount_percent INT DEFAULT 10,
         appointment_id INT DEFAULT NULL,
+        service_id INT DEFAULT NULL,
         expires_at DATETIME NOT NULL,
         is_used BOOLEAN DEFAULT FALSE,
+        max_uses INT DEFAULT 1,
+        current_uses INT DEFAULT 0,
         created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
       )
     `);
@@ -155,17 +159,19 @@ app.post('/api/contact', async (req, res) => {
 app.post('/api/bookings', async (req, res) => {
   const { name, email, phone, service, date, time, technician, voucherCode } = req.body;
   
+  const connection = await mysql.createConnection(dbConfig);
   try {
-    const connection = await mysql.createConnection(dbConfig);
+    await connection.beginTransaction();
     
     // Check if technician is already busy in this slot OR if the client already has a booking at this time
     const [existing] = await connection.execute(
-      'SELECT id, technician_id, customer_email FROM appointments WHERE booking_date = ? AND booking_time = ? AND status != "cancelled" AND (technician_id = ? OR customer_email = ?)',
+      'SELECT id, technician_id, customer_email FROM appointments WHERE booking_date = ? AND booking_time = ? AND status != "cancelled" AND (technician_id = ? OR customer_email = ?) FOR UPDATE',
       [date, time, technician, email]
     );
 
     if (existing.length > 0) {
       const conflict = existing[0];
+      await connection.rollback();
       await connection.end();
       if (conflict.technician_id == technician) {
         return res.status(400).json({ success: false, message: 'O técnico já tem uma marcação para este horário.' });
@@ -181,14 +187,40 @@ app.post('/api/bookings', async (req, res) => {
     );
 
     if (blocked.length > 0) {
+      await connection.rollback();
       await connection.end();
       return res.status(400).json({ success: false, message: 'O técnico indicou que está indisponível para este horário (Pausa/Bloqueio).' });
     }
 
+    // 3. Voucher Validation (Atomic Check)
+    if (voucherCode) {
+      const [vRows] = await connection.execute(
+        'SELECT id, current_uses, max_uses FROM vouchers WHERE code = ? AND expires_at > NOW() FOR UPDATE',
+        [voucherCode]
+      );
+      if (vRows.length === 0 || vRows[0].current_uses >= vRows[0].max_uses) {
+        await connection.rollback();
+        await connection.end();
+        return res.status(400).json({ success: false, message: 'O voucher que tentou usar esgotou-se no último segundo.' });
+      }
+      
+      // Increment uses atomically
+      await connection.execute(
+        'UPDATE vouchers SET current_uses = current_uses + 1, is_used = (current_uses >= max_uses - 1) WHERE id = ?',
+        [vRows[0].id]
+      );
+    }
+
     const [result] = await connection.execute(
-      'INSERT INTO appointments (customer_name, customer_email, customer_phone, service_name, technician_id, booking_date, booking_time) VALUES (?, ?, ?, ?, ?, ?, ?)',
+      'INSERT INTO appointments (customer_name, customer_email, customer_phone, service_name, technician_id, booking_date, booking_time, status) VALUES (?, ?, ?, ?, ?, ?, ?, "pending")',
       [name, email, phone, service, technician, date, time]
     );
+
+    if (voucherCode) {
+        await connection.execute('UPDATE vouchers SET appointment_id = ? WHERE code = ? AND appointment_id IS NULL LIMIT 1', [result.insertId, voucherCode]);
+    }
+
+    await connection.commit();
     await connection.end();
 
     // Send Confirmation to Client
@@ -207,14 +239,9 @@ app.post('/api/bookings', async (req, res) => {
       message: 'Reserva efetuada com sucesso!',
       bookingId: result.insertId 
     });
-
-    // Mark voucher as used if applicable
-    if (voucherCode) {
-      const conn = await mysql.createConnection(dbConfig);
-      await conn.execute('UPDATE vouchers SET is_used = TRUE WHERE code = ?', [voucherCode]);
-      await conn.end();
-    }
   } catch (error) {
+    await connection.rollback();
+    await connection.end();
     console.error('Booking error:', error);
     res.status(500).json({ success: false, message: 'Erro ao processar reserva.' });
   }
@@ -429,6 +456,12 @@ app.patch('/api/bookings/:id', async (req, res) => {
 
   try {
     const connection = await mysql.createConnection(dbConfig);
+    
+    // Restore voucher usage if cancelled
+    if (status === 'cancelled') {
+        await connection.execute('UPDATE vouchers SET current_uses = GREATEST(0, current_uses - 1), is_used = FALSE WHERE appointment_id = ?', [id]);
+    }
+
     await connection.execute(
       'UPDATE appointments SET status = ? WHERE id = ?',
       [status, id]
@@ -493,7 +526,7 @@ app.patch('/api/services/:id', async (req, res) => {
     return res.status(403).json({ success: false, message: 'Não autorizado' });
   }
   const { id } = req.params;
-  const { checklist, promo_discount, promo_validity } = req.body;
+  const { checklist, promo_discount, promo_validity, vouchers_enabled } = req.body;
   try {
     const connection = await mysql.createConnection(dbConfig);
     if (checklist !== undefined) {
@@ -504,6 +537,9 @@ app.patch('/api/services/:id', async (req, res) => {
     }
     if (promo_validity !== undefined) {
       await connection.execute('UPDATE services SET promo_validity = ? WHERE id = ?', [promo_validity, id]);
+    }
+    if (vouchers_enabled !== undefined) {
+      await connection.execute('UPDATE services SET vouchers_enabled = ? WHERE id = ?', [vouchers_enabled, id]);
     }
     await connection.end();
     res.json({ success: true, message: 'Serviço atualizado com sucesso!' });
@@ -592,18 +628,30 @@ app.post('/api/bookings/:id/promote', async (req, res) => {
 });
 
 app.get('/api/vouchers/validate', async (req, res) => {
-  const { code } = req.query;
+  const { code, serviceId } = req.query;
   try {
     const connection = await mysql.createConnection(dbConfig);
+    
+    // Check if service allows vouchers first
+    const [srv] = await connection.execute('SELECT vouchers_enabled FROM services WHERE id = ?', [serviceId]);
+    if (srv.length > 0 && !srv[0].vouchers_enabled) {
+      await connection.end();
+      return res.json({ success: false, message: 'Este serviço não permite a utilização de vouchers de desconto.' });
+    }
+
     const [rows] = await connection.execute(
-      'SELECT * FROM vouchers WHERE code = ? AND is_used = FALSE AND expires_at > NOW()',
+      'SELECT * FROM vouchers WHERE code = ? AND current_uses < max_uses AND expires_at > NOW()',
       [code]
     );
     await connection.end();
     if (rows.length > 0) {
-      res.json({ success: true, discount: rows[0].discount_percent });
+      const v = rows[0];
+      if (v.service_id && v.service_id != serviceId) {
+        return res.json({ success: false, message: 'Voucher não é válido para este tratamento.' });
+      }
+      res.json({ success: true, discount: v.discount_percent });
     } else {
-      res.json({ success: false, message: 'Código inválido ou expirado.' });
+      res.json({ success: false, message: 'Código inválido ou limite de uso atingido.' });
     }
   } catch (error) {
     res.status(500).json({ success: false, error: error.message });
@@ -744,6 +792,117 @@ app.delete('/api/services/:id/permanent', async (req, res) => {
     await connection.execute('DELETE FROM services WHERE id = ?', [id]);
     await connection.end();
     res.json({ success: true, message: 'Serviço eliminado definitivamente.' });
+  } catch (error) {
+    res.status(500).json({ success: false, error: error.message });
+  }
+});
+
+// List all vouchers (with status)
+app.get('/api/vouchers', async (req, res) => {
+  try {
+    const connection = await mysql.createConnection(dbConfig);
+    const [rows] = await connection.execute('SELECT * FROM vouchers ORDER BY created_at DESC');
+    await connection.end();
+    res.json(rows);
+  } catch (error) {
+    res.status(500).json({ success: false, error: error.message });
+  }
+});
+
+// Create manual voucher
+app.post('/api/vouchers', async (req, res) => {
+  const auth = req.headers.authorization || '';
+  if (auth !== 'fake-jwt-shakti-admin') return res.status(403).json({ success: false, message: 'Não autorizado' });
+  
+  const { code, discount, service_id, expires_at, max_uses } = req.body;
+  try {
+    const connection = await mysql.createConnection(dbConfig);
+    await connection.execute(
+      'INSERT INTO vouchers (code, discount_percent, service_id, expires_at, max_uses) VALUES (?, ?, ?, ?, ?)',
+      [code, discount, service_id, expires_at, max_uses || 1]
+    );
+    await connection.end();
+    res.json({ success: true, message: 'Voucher criado!' });
+  } catch (error) {
+    res.status(500).json({ success: false, error: error.message });
+  }
+});
+
+// Delete voucher
+app.delete('/api/vouchers/:id', async (req, res) => {
+  const auth = req.headers.authorization || '';
+  if (auth !== 'fake-jwt-shakti-admin') return res.status(403).json({ success: false, message: 'Não autorizado' });
+  
+  const { id } = req.params;
+  try {
+    const connection = await mysql.createConnection(dbConfig);
+    await connection.execute('DELETE FROM vouchers WHERE id = ?', [id]);
+    await connection.end();
+    res.json({ success: true, message: 'Voucher removido.' });
+  } catch (error) {
+    res.status(500).json({ success: false, error: error.message });
+  }
+});
+
+// Productivity and Revenue Report
+app.get('/api/reports/stats', async (req, res) => {
+  const { start, end } = req.query; // Expecting YYYY-MM-DD
+  try {
+    const connection = await mysql.createConnection(dbConfig);
+    
+    let dateFilter = '';
+    let params = [];
+    if (start && end) {
+      dateFilter = ' AND booking_date BETWEEN ? AND ?';
+      params = [start, end];
+    }
+
+    // 1. General Stats
+    const [counts] = await connection.execute(
+      `SELECT 
+        COUNT(*) as total,
+        SUM(CASE WHEN status = 'confirmed' THEN 1 ELSE 0 END) as confirmed,
+        SUM(CASE WHEN status = 'cancelled' THEN 1 ELSE 0 END) as cancelled
+       FROM appointments WHERE 1=1${dateFilter}`,
+      params
+    );
+
+    // 2. Revenue (Assuming confirmed orders generate revenue)
+    // We join with services (search by name string matches) to get prices
+    const [revenue] = await connection.execute(
+      `SELECT SUM(CAST(REPLACE(s.price, '€', '') AS DECIMAL)) as total_rev
+       FROM appointments a
+       JOIN services s ON a.service_name = s.name
+       WHERE a.status = 'confirmed'${dateFilter}`,
+      params
+    );
+
+    // 3. Productivity by Technician
+    const [techStats] = await connection.execute(
+      `SELECT t.name, COUNT(a.id) as count, SUM(CAST(REPLACE(s.price, '€', '') AS DECIMAL)) as revenue
+       FROM appointments a
+       JOIN technicians t ON a.technician_id = t.id
+       JOIN services s ON a.service_name = s.name
+       WHERE a.status = 'confirmed'${dateFilter}
+       GROUP BY t.id`,
+      params
+    );
+
+    // 4. Voucher Impact
+    const [voucherStats] = await connection.execute(
+      `SELECT COUNT(v.id) as used_count, SUM(v.discount_percent) as total_discount_points
+       FROM vouchers v
+       WHERE v.is_used = TRUE${start ? ' AND v.created_at >= ?' : ''} ${end ? ' AND v.created_at <= ?' : ''}`,
+       start && end ? [start, end] : []
+    );
+
+    await connection.end();
+    res.json({
+      summary: counts[0],
+      revenue: revenue[0].total_rev || 0,
+      technicians: techStats,
+      vouchers: voucherStats[0]
+    });
   } catch (error) {
     res.status(500).json({ success: false, error: error.message });
   }

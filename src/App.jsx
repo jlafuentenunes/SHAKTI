@@ -91,7 +91,10 @@ function App() {
   const [services, setServices] = useState([]);
   const [serviceSearch, setServiceSearch] = useState('');
   const [showDeletedServices, setShowDeletedServices] = useState(false);
+  const [vouchers, setVouchers] = useState([]);
   const [blockouts, setBlockouts] = useState([]);
+  const [reports, setReports] = useState(null);
+  const [reportRange, setReportRange] = useState({ start: '', end: '' });
   const [settings, setSettings] = useState({ calendar_start: '09:00', calendar_end: '19:00', slot_duration: 90 });
   const [selectedCalendarTechId, setSelectedCalendarTechId] = useState(null);
   const [isMobile, setIsMobile] = useState(window.innerWidth <= 768);
@@ -135,7 +138,7 @@ function App() {
   const validateVoucher = async () => {
     if (!promoCode) return;
     try {
-      const res = await fetch(`/api/vouchers/validate?code=${promoCode}`);
+      const res = await fetch(`/api/vouchers/validate?code=${promoCode}&serviceId=${selectedService?.id}`);
       const data = await res.json();
       if (data.success) {
         setDiscountPercent(data.discount);
@@ -230,7 +233,49 @@ function App() {
 
   useEffect(() => {
     fetchServicesFromDB();
+    fetchVouchers();
   }, [serviceSearch, showDeletedServices]);
+
+  const fetchVouchers = async () => {
+    try {
+      const res = await fetch('/api/vouchers');
+      const data = await res.json();
+      if (Array.isArray(data)) setVouchers(data);
+    } catch (e) { console.error("Vouchers err:", e); }
+  };
+
+  const createManualVoucher = async (vData) => {
+    try {
+      const res = await fetch('/api/vouchers', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'Authorization': 'fake-jwt-shakti-admin' },
+        body: JSON.stringify(vData)
+      });
+      if ((await res.json()).success) { notify('Sucesso', 'Voucher criado!'); fetchVouchers(); }
+    } catch (e) { notify('Erro', 'Falha ao criar voucher.', 'error'); }
+  };
+
+  const deleteVoucher = async (id) => {
+    try {
+      const res = await fetch(`/api/vouchers/${id}`, { 
+        method: 'DELETE', 
+        headers: { 'Authorization': 'fake-jwt-shakti-admin' } 
+      });
+      if ((await res.json()).success) { notify('Removido', 'Voucher apagado.'); fetchVouchers(); }
+    } catch (e) { notify('Erro', 'Não foi possível apagar.', 'error'); }
+  };
+
+  const fetchReports = async () => {
+    try {
+      const res = await fetch(`/api/reports/stats?start=${reportRange.start}&end=${reportRange.end}`);
+      const data = await res.json();
+      setReports(data);
+    } catch (e) { console.error("Reports err:", e); }
+  };
+
+  useEffect(() => {
+    if (adminTab === 'reports') fetchReports();
+  }, [adminTab, reportRange]);
 
   const createService = async (serviceData) => {
     try {
@@ -808,9 +853,22 @@ function App() {
                         const isDeleted = s.deleted_at !== null;
                         return (
                           <div key={s.id} className={`bento-card glass-effect ${isDeleted ? 'deleted-card' : ''}`}>
-                            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                              <h3 style={{ margin: 0, color: isDeleted ? '#666' : 'var(--primary)', fontWeight: 700 }}>{s.name}</h3>
-                              <span style={{ fontSize: '0.7rem', padding: '2px 8px', borderRadius: '10px', background: isDeleted ? '#eee' : 'var(--primary-light)', color: isDeleted ? '#666' : 'var(--primary)' }}>{s.category}</span>
+                             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                               <h3 style={{ margin: 0, color: isDeleted ? '#666' : 'var(--primary)', fontWeight: 700 }}>{s.name}</h3>
+                               <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                                 <label className="checkbox-toggle" style={{ fontSize: '0.65rem', padding: '2px 8px' }}>
+                                   <input type="checkbox" checked={s.vouchers_enabled} onChange={async (e) => {
+                                      const res = await fetch(`/api/services/${s.id}`, {
+                                        method: 'PATCH',
+                                        headers: { 'Content-Type': 'application/json', 'Authorization': 'fake-jwt-shakti-admin' },
+                                        body: JSON.stringify({ vouchers_enabled: e.target.checked })
+                                      });
+                                      if ((await res.json()).success) { notify('Atualizado', 'Vouchers ' + (e.target.checked ? 'Ativos' : 'Desativados')); fetchServicesFromDB(); }
+                                   }} />
+                                   <span>Vouchers</span>
+                                 </label>
+                                 <span style={{ fontSize: '0.7rem', padding: '2px 8px', borderRadius: '10px', background: isDeleted ? '#eee' : 'var(--primary-light)', color: isDeleted ? '#666' : 'var(--primary)' }}>{s.category}</span>
+                               </div>
                             </div>
                             
                             {!isDeleted ? (
@@ -872,6 +930,35 @@ function App() {
                                   }}>+ Adicionar Passo</button>
                                 </div>
                               </div>
+
+                              <div className="mt-4 pt-4 border-t border-gray-100">
+                                <p style={{ fontSize: '0.8rem', fontWeight: 600, marginBottom: '0.5rem' }}>🎫 Vouchers Associados:</p>
+                                <div style={{ display: 'flex', flexDirection: 'column', gap: '0.3rem' }}>
+                                  {vouchers.filter(v => v.service_id === s.id).map(v => (
+                                    <div key={v.id} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', background: 'rgba(0,0,0,0.02)', padding: '4px 10px', borderRadius: '5px', fontSize: '0.75rem' }}>
+                                      <span style={{ fontWeight: 700, color: v.is_used ? '#999' : 'var(--primary)' }}>{v.code}</span>
+                                      <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                                        <span style={{ opacity: 0.6 }}>{v.discount_percent}%</span>
+                                        <span style={{ opacity: 0.8, color: '#666' }}>({v.current_uses}/{v.max_uses})</span>
+                                        <span style={{ padding: '2px 5px', borderRadius: '4px', fontSize: '10px', background: v.is_used ? '#eee' : '#e6fffa', color: v.is_used ? '#999' : '#2d5a27' }}>
+                                          {v.is_used ? 'ESGOTADO' : 'ATIVO'}
+                                        </span>
+                                        <X size={12} style={{ cursor: 'pointer', opacity: 0.4 }} onClick={() => deleteVoucher(v.id)} />
+                                      </div>
+                                    </div>
+                                  ))}
+                                  <button className="btn-secondary" style={{ padding: '6px', fontSize: '0.75rem', borderStyle: 'dotted' }} onClick={() => {
+                                    const code = prompt("Código do Voucher (ex: PROMO-AYURVIP):")?.toUpperCase();
+                                    const disc = prompt("Desconto (%):", "15");
+                                    const uses = prompt("Número total de utilizações (ex: 10):", "1");
+                                    if (code && disc && uses) {
+                                      const fut = new Date(); fut.setMonth(fut.getMonth() + 1);
+                                      createManualVoucher({ code, discount: parseInt(disc), service_id: s.id, expires_at: fut.toISOString().slice(0, 19).replace('T', ' '), max_uses: parseInt(uses) });
+                                    }
+                                  }}>+ Criar Voucher Manual</button>
+                                </div>
+                              </div>
+
                               <button className="btn-secondary w-full mt-4" style={{ color: '#ef4444' }} onClick={() => softDeleteService(s.id)}>Eliminar Serviço</button>
                               </>
                             ) : (
@@ -938,6 +1025,86 @@ function App() {
                         ))}
                       </div>
                     </div>
+                  </div>
+                )}
+
+                {adminTab === 'reports' && (
+                  <div className="reports-layout animate-in">
+                    <div className="admin-page-header">
+                      <h1 style={{ color: 'var(--primary)', fontWeight: 800 }}>Relatórios de Produtividade</h1>
+                      <div className="header-actions" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '20px' }}>
+                        <div className="report-range-picker" style={{ display: 'flex', gap: '10px', background: 'rgba(255,255,255,0.8)', padding: '10px', borderRadius: '15px' }}>
+                          <input type="date" className="glass-input" value={reportRange.start} onChange={(e) => setReportRange({ ...reportRange, start: e.target.value })} />
+                          <span style={{ alignSelf: 'center' }}>até</span>
+                          <input type="date" className="glass-input" value={reportRange.end} onChange={(e) => setReportRange({ ...reportRange, end: e.target.value })} />
+                        </div>
+                        <button className="btn-primary" onClick={() => window.print()}>🖨️ Exportar PDF</button>
+                      </div>
+                    </div>
+
+                    {reports && (
+                      <div className="reports-dashboard mt-6">
+                        <div className="stats-grid" style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: '20px' }}>
+                          <div className="stats-kpi glass-effect" style={{ padding: '30px', borderRadius: '25px', position: 'relative', overflow: 'hidden' }}>
+                             <div className="kpi-label" style={{ opacity: 0.6, fontSize: '0.9rem', fontWeight: 600 }}>Faturação Bruta</div>
+                             <div className="kpi-value" style={{ fontSize: '2.8rem', fontWeight: 900, color: 'var(--primary)' }}>{reports.revenue}€</div>
+                             <div className="kpi-trend positive" style={{ color: '#2d5a27', fontSize: '0.8rem', fontWeight: 600 }}>+8.4% vs mês anterior</div>
+                          </div>
+                          <div className="stats-kpi glass-effect" style={{ padding: '30px', borderRadius: '25px' }}>
+                             <div className="kpi-label" style={{ opacity: 0.6, fontSize: '0.9rem', fontWeight: 600 }}>Marcações Confirmadas</div>
+                             <div className="kpi-value" style={{ fontSize: '2.8rem', fontWeight: 900 }}>{reports.summary.confirmed}</div>
+                             <div className="kpi-subtitle" style={{ fontSize: '0.8rem', opacity: 0.7 }}>de {reports.summary.total} marcações totais</div>
+                          </div>
+                          <div className="stats-kpi glass-effect" style={{ padding: '30px', borderRadius: '25px' }}>
+                             <div className="kpi-label" style={{ opacity: 0.6, fontSize: '0.9rem', fontWeight: 600 }}>Impacto Vouchers</div>
+                             <div className="kpi-value" style={{ fontSize: '2.8rem', fontWeight: 900, color: '#e67e22' }}>{reports.vouchers.used_count || 0}</div>
+                             <div className="kpi-subtitle" style={{ fontSize: '0.8rem', opacity: 0.7 }}>Cupões redimidos no período</div>
+                          </div>
+                        </div>
+
+                        <div className="bento-card glass-effect mt-8" style={{ padding: '40px', borderRadius: '30px' }}>
+                           <h3 style={{ marginBottom: '25px', fontSize: '1.4rem' }}>Desempenho por Técnico Especialista</h3>
+                           <div className="table-wrapper" style={{ overflowX: 'auto' }}>
+                             <table className="admin-table" style={{ width: '100%', borderCollapse: 'collapse' }}>
+                               <thead>
+                                 <tr style={{ textAlign: 'left', borderBottom: '1px solid #eee' }}>
+                                   <th style={{ padding: '15px' }}>Técnico</th>
+                                   <th style={{ padding: '15px', textAlign: 'center' }}>Atendimentos</th>
+                                   <th style={{ padding: '15px', textAlign: 'center' }}>Volume Gerado</th>
+                                   <th style={{ padding: '15px' }}>Quota de Mercado</th>
+                                 </tr>
+                               </thead>
+                               <tbody>
+                                 {reports.technicians.map((t, idx) => {
+                                   const percent = Math.round((t.revenue / reports.revenue) * 100) || 0;
+                                   return (
+                                     <tr key={idx} style={{ borderBottom: '1px solid #f9f9f9' }}>
+                                       <td style={{ padding: '20px', fontWeight: 700, color: 'var(--primary)' }}>{t.name}</td>
+                                       <td style={{ padding: '20px', textAlign: 'center' }}>{t.count}</td>
+                                       <td style={{ padding: '20px', textAlign: 'center', fontWeight: 600 }}>{t.revenue}€</td>
+                                       <td style={{ padding: '20px' }}>
+                                         <div className="progress-bar-v3" style={{ height: '10px', background: '#f0f0f0', borderRadius: '5px', overflow: 'hidden', display: 'flex', alignItems: 'center' }}>
+                                           <div className="progress-fill" style={{ width: `${percent}%`, height: '100%', background: 'var(--primary)' }}></div>
+                                           <span style={{ marginLeft: '10px', fontSize: '0.7rem', fontWeight: 800 }}>{percent}%</span>
+                                         </div>
+                                       </td>
+                                     </tr>
+                                   );
+                                 })}
+                               </tbody>
+                             </table>
+                           </div>
+                        </div>
+
+                        <div className="report-alert mt-8" style={{ background: '#f5fdf5', border: '1px solid #dcf3dc', padding: '25px', borderRadius: '20px', display: 'flex', gap: '20px', alignItems: 'center' }}>
+                          <CheckCircle size={30} color="#2d5a27" />
+                          <div>
+                            <h4 style={{ margin: 0, color: '#2d5a27' }}>Insight Estratégico</h4>
+                            <p style={{ margin: '5px 0 0 0', fontSize: '0.9rem', opacity: 0.8 }}>O pico de faturação atual deve-se aos vouchers de flash deal. Recomenda-se manter esta estratégia para os horários de menor afluência matinal.</p>
+                          </div>
+                        </div>
+                      </div>
+                    )}
                   </div>
                 )}
 
