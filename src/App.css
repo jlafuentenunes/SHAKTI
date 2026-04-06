@@ -1500,6 +1500,78 @@
   border-color: var(--primary);
 }
 
+/* Admin Analytics Styling */
+.admin-stats-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  gap: 1.5rem;
+  margin-bottom: 2.5rem;
+}
+
+.stat-card {
+  padding: 1.5rem;
+  border-radius: var(--radius-lg);
+  display: flex;
+  align-items: center;
+  gap: 1.2rem;
+  transition: transform 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+}
+
+.stat-card:hover {
+  transform: translateY(-5px);
+}
+
+.stat-icon {
+  width: 48px;
+  height: 48px;
+  border-radius: 14px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.stat-info small {
+  display: block;
+  font-size: 0.75rem;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--text-muted);
+  font-weight: 600;
+  margin-bottom: 0.2rem;
+}
+
+.stat-info h3 {
+  margin: 0;
+  font-size: 1.5rem;
+  font-weight: 800;
+  color: var(--primary);
+}
+
+.chart-card {
+  padding: 2rem;
+  border-radius: var(--radius-xl);
+}
+
+.chart-card h3 {
+  font-size: 1.1rem;
+  font-weight: 700;
+  margin: 0;
+}
+
+.svg-chart-container svg text {
+  font-family: 'Outfit', sans-serif;
+  user-select: none;
+}
+
+.bar-row {
+  margin-bottom: 1.2rem;
+}
+
+.tech-stat-box h2 {
+  letter-spacing: -1px;
+}
+
+
 .glass-input {
   width: 100%;
   padding: 0.8rem 1rem;
@@ -1795,4 +1867,216 @@
 .deleted-card:hover {
   opacity: 0.9;
   filter: grayscale(0);
+}
+
+/* AR Beauty Mirror Styles */
+.mirror-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0,0,0,0.9);
+  z-index: 2000;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 20px;
+}
+
+.mirror-content {
+  background: white;
+  width: 100%;
+  max-width: 1000px;
+  height: 85vh;
+  border-radius: 30px;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+}
+
+.mirror-studio {
+  flex: 1;
+  display: grid;
+  grid-template-columns: 3fr 2fr;
+  height: 100%;
+}
+
+.mirror-viewport {
+  background: #000;
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  overflow: hidden;
+}
+
+.video-placeholder {
+  width: 100%;
+  height: 100%;
+  border: 2px dashed rgba(255,255,255,0.2);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  color: white;
+}
+
+.ar-overlay {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  z-index: 5;
+}
+
+.mirror-controls {
+  padding: 40px;
+  background: #fdfcfb;
+  overflow-y: auto;
+}
+
+.style-list {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.style-btn {
+  padding: 15px;
+  border-radius: 15px;
+  border: 1px solid #eee;
+  background: white;
+  text-align: left;
+  font-weight: 600;
+  transition: 0.3s;
+}
+
+.style-btn.active {
+  background: var(--primary);
+  color: white;
+  border-color: var(--primary);
+}
+
+@media (max-width: 768px) {
+  .mirror-studio {
+    grid-template-columns: 1fr;
+  }
+}
+
+/* Gender Selector for AI Studio */
+.gender-btn {
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  cursor: pointer;
+  font-weight: 700;
+}
+
+.gender-btn.active {
+  box-shadow: 0 4px 15px rgba(0,0,0,0.1);
+}
+
+.ar-overlay.beard-overlay {
+  z-index: 6;
+  opacity: 0.5;
+}
+
+/* AI Mirror Enhancements */
+.style-ar-preview {
+  pointer-events: none;
+  z-index: 10;
+}
+
+.beard-ar, .hair-ar {
+  transition: all 0.5s ease-in-out;
+  animation: ar-pulse 2s infinite alternate;
+}
+
+@keyframes ar-pulse {
+  from { opacity: 0.7; transform: scale(1); }
+  to { opacity: 0.9; transform: scale(1.02); }
+}
+/* AI Mirror Enhanced Styles */
+.ai-processing-overlay {
+  position: absolute;
+  inset: 0;
+  background: rgba(44, 74, 62, 0.85);
+  backdrop-filter: blur(15px);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  z-index: 100;
+  color: white;
+  text-align: center;
+  padding: 2rem;
+}
+
+.processing-spinner {
+  width: 60px;
+  height: 60px;
+  border: 4px solid rgba(255, 255, 255, 0.1);
+  border-top: 4px solid var(--accent);
+  border-radius: 50%;
+  animation: spin 1s cubic-bezier(0.5, 0.1, 0.5, 0.9) infinite;
+  margin-bottom: 1.5rem;
+}
+
+@keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
+
+.ai-processing-overlay p {
+  font-family: 'Outfit', sans-serif;
+  font-size: 1.1rem;
+  font-weight: 500;
+  margin-bottom: 0.5rem;
+}
+
+.ai-processing-overlay small {
+  opacity: 0.7;
+  font-size: 0.8rem;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+}
+
+.ai-result-view {
+  position: absolute;
+  inset: 0;
+  z-index: 110;
+  background: var(--white);
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+.ai-result-view img {
+  width: 100%;
+  height: 70%;
+  object-fit: cover;
+}
+
+.ai-result-footer {
+  padding: 1.5rem;
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  background: var(--surface);
+}
+
+.ai-result-footer h4 {
+  font-family: 'Outfit', sans-serif;
+  font-size: 1.25rem;
+  color: var(--primary);
+  margin-bottom: 0.5rem;
+}
+
+.ai-result-footer p {
+  font-size: 0.85rem;
+  color: var(--text-muted);
+  margin-bottom: 1.5rem;
+}
+
+/* Animations */
+.animate-in {
+  animation: fadeIn 0.6s ease-out forwards;
+}
+
+@keyframes fadeIn {
+  from { opacity: 0; transform: translateY(10px); }
+  to { opacity: 1; transform: translateY(0); }
 }

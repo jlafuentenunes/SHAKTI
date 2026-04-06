@@ -22,7 +22,9 @@ import {
   AlertTriangle,
   CheckSquare,
   Package,
-  Zap
+  Zap,
+  Camera,
+  BarChart2
 } from 'lucide-react';
 
 const Facebook = ({ size = 24, ...props }) => (
@@ -78,6 +80,10 @@ function App() {
     time: ''
   });
   const [view, setView] = useState('client'); // 'client' or 'admin'
+  const [isMirrorOpen, setIsMirrorOpen] = useState(false);
+  const [mirrorColor, setMirrorColor] = useState('#e74c3c');
+  const [mirrorHair, setMirrorHair] = useState('none');
+  const [mirrorGender, setMirrorGender] = useState('female');
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [busySlots, setBusySlots] = useState([]);
   const [appointments, setAppointments] = useState([]);
@@ -99,8 +105,129 @@ function App() {
   const [selectedCustomer, setSelectedCustomer] = useState(null);
   const [customerSearch, setCustomerSearch] = useState('');
   const [settings, setSettings] = useState({ calendar_start: '09:00', calendar_end: '19:00', slot_duration: 90 });
+  const [analytics, setAnalytics] = useState({ revenue: 0, trends: [], services: [], customers: { total_customers: 0, active_customers: 0 }, technicians: [] });
   const [selectedCalendarTechId, setSelectedCalendarTechId] = useState(null);
-  const [isMobile, setIsMobile] = useState(window.innerWidth <= 768);
+  const [isMobile, setIsMobile] = useState(window.innerWidth < 768);
+
+  const videoRef = React.useRef(null);
+  const canvasRef = React.useRef(null);
+  const resultsRef = React.useRef(null);
+  const logoRef = React.useRef(null);
+  const [isGeneratingLook, setIsGeneratingLook] = useState(false);
+  const [capturedPhoto, setCapturedPhoto] = useState(null);
+  const [capturedLandmarks, setCapturedLandmarks] = useState(null);
+  const [mirrorStage, setMirrorStage] = useState('choosing'); // 'choosing', 'camera', 'result'
+  const isPhotoView = mirrorStage === 'result';
+
+  useEffect(() => {
+    if (isMirrorOpen && mirrorStage !== 'choosing' && window.FaceMesh) {
+      const faceMesh = new window.FaceMesh({
+        locateFile: (file) => `https://cdn.jsdelivr.net/npm/@mediapipe/face_mesh/${file}`
+      });
+
+      faceMesh.setOptions({
+        maxNumFaces: 1,
+        refineLandmarks: true,
+        minDetectionConfidence: 0.5,
+        minTrackingConfidence: 0.5
+      });
+
+      const LIPS_OUTER = [61, 146, 91, 181, 84, 17, 314, 405, 321, 375, 291, 308, 324, 318, 402, 317, 14, 87, 178, 88, 95];
+      const FACE_OVAL = [10, 338, 297, 332, 284, 251, 389, 356, 454, 323, 361, 288, 397, 365, 379, 378, 400, 377, 152, 148, 176, 149, 150, 136, 172, 58, 132, 93, 234, 127, 162, 21, 54, 103, 67, 109];
+
+      const drawAR = (results) => {
+        if (!canvasRef.current) return;
+        const canvas = canvasRef.current;
+        const ctx = canvas.getContext('2d');
+        ctx.clearRect(0, 0, canvas.width, canvas.height);
+          
+        if (results && results[0]) {
+             const m = results[0];
+             const w = canvas.width;
+             const h = canvas.height;
+
+             if (mirrorGender === 'female' && mirrorColor !== '#ecf0f1') {
+                ctx.fillStyle = mirrorColor;
+                ctx.globalAlpha = 0.55;
+                ctx.beginPath();
+                LIPS_OUTER.forEach((idx, i) => {
+                  const pt = m[idx];
+                  if (i === 0) ctx.moveTo(pt.x * w, pt.y * h);
+                  else ctx.lineTo(pt.x * w, pt.y * h);
+                });
+                ctx.closePath();
+                ctx.fill();
+                ctx.globalAlpha = 1.0;
+             }
+
+             if (mirrorHair !== 'none') {
+                ctx.beginPath();
+                if (mirrorGender === 'male' && mirrorHair.includes('beard')) {
+                  ctx.fillStyle = 'rgba(40, 25, 10, 0.7)';
+                  const BEARD_LANDMARKS = [152, 148, 176, 149, 150, 136, 172, 58, 132, 93, 234, 127, 21, 54, 103, 67, 109, 10, 338, 297, 332, 284, 251, 389, 356, 454, 323, 361, 288, 397, 365, 379, 378, 400, 377, 152];
+                  BEARD_LANDMARKS.forEach((idx, i) => {
+                    const pt = m[idx];
+                    if (i === 0) ctx.moveTo(pt.x * w, pt.y * h);
+                    else ctx.lineTo(pt.x * w, pt.y * h);
+                  });
+                  ctx.fill();
+                } else if (mirrorGender === 'female') {
+                  ctx.fillStyle = 'rgba(60, 30, 15, 0.5)';
+                  ctx.beginPath();
+                  const TOP_HEAD = [10, 338, 297, 332, 284, 251, 389, 356, 454];
+                  const firstPt = m[10];
+                  ctx.moveTo(firstPt.x * w, (firstPt.y - 0.15) * h);
+                  TOP_HEAD.forEach((idx) => {
+                    const pt = m[idx];
+                    ctx.lineTo(pt.x * w, (pt.y - 0.1) * h);
+                  });
+                  if (mirrorHair === 'long') {
+                    ctx.lineTo(m[454].x * w + 40, m[454].y * h + 200);
+                    ctx.lineTo(m[234].x * w - 40, m[234].y * h + 200);
+                  } else if (mirrorHair === 'bob') {
+                    ctx.lineTo(m[454].x * w + 30, m[454].y * h + 60);
+                    ctx.lineTo(m[234].x * w - 30, m[234].y * h + 60);
+                  }
+                  ctx.closePath();
+                  ctx.fill();
+                }
+             }
+        }
+      };
+
+      faceMesh.onResults((results) => {
+        resultsRef.current = results;
+        if (!isPhotoView) {
+          if (canvasRef.current && videoRef.current) {
+            const video = videoRef.current;
+            if (canvasRef.current.width !== video.videoWidth) {
+              canvasRef.current.width = video.videoWidth || 640;
+              canvasRef.current.height = video.videoHeight || 480;
+            }
+          }
+          drawAR(results.multiFaceLandmarks);
+        }
+      });
+
+      if (isPhotoView && capturedLandmarks) {
+        drawAR([capturedLandmarks]);
+      }
+
+      const camera = new window.Camera(videoRef.current, {
+        onFrame: async () => {
+          if (!isPhotoView) {
+            await faceMesh.send({image: videoRef.current});
+          }
+        },
+        width: 640,
+        height: 480
+      });
+      camera.start();
+
+      return () => { camera.stop(); faceMesh.close(); };
+    }
+  }, [isMirrorOpen, mirrorHair, mirrorColor, mirrorGender, mirrorStage, isPhotoView, capturedLandmarks]);
+
   const [contactForm, setContactForm] = useState({
     name: '',
     email: '',
@@ -120,6 +247,16 @@ function App() {
 
   const [promoCode, setPromoCode] = useState('');
   const [discountPercent, setDiscountPercent] = useState(0);
+
+  const fetchAnalytics = async () => {
+    try {
+      const response = await fetch('/api/reports/analytics', {
+        headers: { 'Authorization': localStorage.getItem('shakti-token') }
+      });
+      const data = await response.json();
+      setAnalytics(data);
+    } catch (error) { console.error('Analytics error:', error); }
+  };
 
   const handlePromote = async (id) => {
     try {
@@ -236,8 +373,15 @@ function App() {
 
   useEffect(() => {
     fetchServicesFromDB();
-    fetchVouchers();
-  }, [serviceSearch, showDeletedServices]);
+    fetchTechnicians();
+    fetchAnalytics();
+  }, [calendarDate, adminTab]);
+
+  useEffect(() => {
+    if (isLoggedIn && userRole === 'admin') {
+      fetchAnalytics();
+    }
+  }, [isLoggedIn, appointments]);
 
   const fetchVouchers = async () => {
     try {
@@ -496,6 +640,33 @@ function App() {
     setFormData(prev => ({ ...prev, [name]: value }));
   };
 
+  const handleGenerateAILook = async () => {
+    if (!videoRef.current || !resultsRef.current?.multiFaceLandmarks?.[0]) {
+      notify('Análise Facial', 'A IA está a calibrar os seus pontos faciais. Um momento...', 'info');
+      return;
+    }
+    
+    setIsGeneratingLook(true);
+    
+    // Capture the current frame
+    const video = videoRef.current;
+    const tempCanvas = document.createElement('canvas');
+    tempCanvas.width = video.videoWidth;
+    tempCanvas.height = video.videoHeight;
+    const ctx = tempCanvas.getContext('2d');
+    ctx.scale(-1, 1);
+    ctx.drawImage(video, -tempCanvas.width, 0, tempCanvas.width, tempCanvas.height);
+    
+    setCapturedPhoto(tempCanvas.toDataURL('image/png'));
+    setCapturedLandmarks(resultsRef.current.multiFaceLandmarks[0]);
+
+    await new Promise(resolve => setTimeout(resolve, 2000));
+    
+    setIsGeneratingLook(false);
+    setMirrorStage('result');
+    notify('Look Gerado', 'O seu estilo foi aplicado à foto com sucesso!');
+  };
+
   const handleBookingSubmit = async () => {
     setIsSubmitting(true);
     try {
@@ -548,10 +719,10 @@ function App() {
       setIsSubmitting(false);
     }
   };
-
-  if (view === 'admin') {
-    return (
-      <div className="admin-container">
+  return (
+    <div className="shakti-app">
+      {view === 'admin' ? (
+        <div className="admin-container">
         {!isLoggedIn ? (
           <div className="admin-login-box-wrapper w-full">
             <div className="admin-login-box animate-in">
@@ -630,32 +801,35 @@ function App() {
               <div className="admin-content-area">
                 {adminTab === 'table' && (
                   <>
-                  <div className="bento-stats animate-in">
-                    {/* ... stats cards ... */}
-                    <div className="bento-card">
-                      <h3>Total de Reservas</h3>
-                      <div className="stat-value">{appointments.length}</div>
-                      <div className="stat-trend"><TrendingUp size={14}/> +2% hoje</div>
-                    </div>
-                    <div className="bento-card primary">
-                      <h3>Confirmadas</h3>
-                      <div className="stat-value">{appointments.filter(a => a.status === 'confirmed').length}</div>
-                      <div className="stat-trend">Marcações ativas</div>
-                    </div>
-                    {userRole === 'admin' && (
-                      <div className="bento-card">
-                        <h3>Ganhos Totais</h3>
-                        <div className="stat-value">
-                          {appointments.filter(a => a.status === 'confirmed').reduce((acc, curr) => {
-                            const tech = technicians.find(t => t.id == curr.technician_id);
-                            const service = services.find(s => s.name === curr.service_name);
-                            const hours = service ? (parseFloat(service.duration) / 60) : 1;
-                            return acc + (hours * (tech?.hourly_rate || 0));
-                          }, 0).toFixed(2)}€
-                        </div>
-                        <div className="stat-trend"><DollarSign size={14}/> Previsão semanal</div>
+                  <div className="admin-stats-grid">
+                    <div className="stat-card glass-effect">
+                      <div className="stat-icon" style={{ background: 'rgba(45, 90, 39, 0.1)', color: 'var(--primary)' }}><DollarSign size={20} /></div>
+                      <div className="stat-info">
+                        <small>Faturação Bruta</small>
+                        <h3>{analytics.revenue}€</h3>
                       </div>
-                    )}
+                    </div>
+                    <div className="stat-card glass-effect">
+                      <div className="stat-icon" style={{ background: 'rgba(228, 197, 158, 0.2)', color: '#b68e5e' }}><Users size={20} /></div>
+                      <div className="stat-info">
+                        <small>Clientes Ativos</small>
+                        <h3>{analytics.customers?.active_customers || 0}</h3>
+                      </div>
+                    </div>
+                    <div className="stat-card glass-effect">
+                      <div className="stat-icon" style={{ background: 'rgba(52, 152, 219, 0.1)', color: '#3498db' }}><Calendar size={20} /></div>
+                      <div className="stat-info">
+                        <small>Agendamentos</small>
+                        <h3>{appointments.filter(a => a.status !== 'cancelled').length}</h3>
+                      </div>
+                    </div>
+                    <div className="stat-card glass-effect">
+                      <div className="stat-icon" style={{ background: 'rgba(155, 89, 182, 0.1)', color: '#9b59b6' }}><TrendingUp size={20} /></div>
+                      <div className="stat-info">
+                         <small>LTV Médio</small>
+                         <h3>{(analytics.revenue / (analytics.customers?.total_customers || 1)).toFixed(2)}€</h3>
+                      </div>
+                    </div>
                   </div>
 
                   {/* Standard Table (Desktop) */}
@@ -1242,82 +1416,96 @@ function App() {
                 )}
 
                 {adminTab === 'reports' && (
-                  <div className="reports-layout animate-in">
+                  <div className="admin-reports-view animate-in">
                     <div className="admin-page-header">
-                      <h1 style={{ color: 'var(--primary)', fontWeight: 800 }}>Relatórios de Produtividade</h1>
-                      <div className="header-actions" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '20px' }}>
-                        <div className="report-range-picker" style={{ display: 'flex', gap: '10px', background: 'rgba(255,255,255,0.8)', padding: '10px', borderRadius: '15px' }}>
-                          <input type="date" className="glass-input" value={reportRange.start} onChange={(e) => setReportRange({ ...reportRange, start: e.target.value })} />
-                          <span style={{ alignSelf: 'center' }}>até</span>
-                          <input type="date" className="glass-input" value={reportRange.end} onChange={(e) => setReportRange({ ...reportRange, end: e.target.value })} />
-                        </div>
-                        <button className="btn-primary" onClick={() => window.print()}>🖨️ Exportar PDF</button>
-                      </div>
+                      <h1>Analytics & Business Intelligence</h1>
+                      <p>Dados globais de crescimento e performance da Shakti Home.</p>
                     </div>
 
-                    {reports && (
-                      <div className="reports-dashboard mt-6">
-                        <div className="stats-grid" style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: '20px' }}>
-                          <div className="stats-kpi glass-effect" style={{ padding: '30px', borderRadius: '25px', position: 'relative', overflow: 'hidden' }}>
-                             <div className="kpi-label" style={{ opacity: 0.6, fontSize: '0.9rem', fontWeight: 600 }}>Faturação Bruta</div>
-                             <div className="kpi-value" style={{ fontSize: '2.8rem', fontWeight: 900, color: 'var(--primary)' }}>{reports.revenue}€</div>
-                             <div className="kpi-trend positive" style={{ color: '#2d5a27', fontSize: '0.8rem', fontWeight: 600 }}>+8.4% vs mês anterior</div>
-                          </div>
-                          <div className="stats-kpi glass-effect" style={{ padding: '30px', borderRadius: '25px' }}>
-                             <div className="kpi-label" style={{ opacity: 0.6, fontSize: '0.9rem', fontWeight: 600 }}>Marcações Confirmadas</div>
-                             <div className="kpi-value" style={{ fontSize: '2.8rem', fontWeight: 900 }}>{reports.summary.confirmed}</div>
-                             <div className="kpi-subtitle" style={{ fontSize: '0.8rem', opacity: 0.7 }}>de {reports.summary.total} marcações totais</div>
-                          </div>
-                          <div className="stats-kpi glass-effect" style={{ padding: '30px', borderRadius: '25px' }}>
-                             <div className="kpi-label" style={{ opacity: 0.6, fontSize: '0.9rem', fontWeight: 600 }}>Impacto Vouchers</div>
-                             <div className="kpi-value" style={{ fontSize: '2.8rem', fontWeight: 900, color: '#e67e22' }}>{reports.vouchers.used_count || 0}</div>
-                             <div className="kpi-subtitle" style={{ fontSize: '0.8rem', opacity: 0.7 }}>Cupões redimidos no período</div>
-                          </div>
+                    <div className="reports-grid" style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(400px, 1fr))', gap: '30px', marginTop: '30px' }}>
+                      
+                      {/* Trend Chart (SVG) */}
+                      <div className="bento-card glass-effect chart-card">
+                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '25px' }}>
+                           <h3>Tendência de Agendamentos (7 dias)</h3>
+                           <RefreshCcw size={16} style={{ cursor: 'pointer', opacity: 0.5 }} onClick={fetchAnalytics} />
                         </div>
-
-                        <div className="bento-card glass-effect mt-8" style={{ padding: '40px', borderRadius: '30px' }}>
-                           <h3 style={{ marginBottom: '25px', fontSize: '1.4rem' }}>Desempenho por Técnico Especialista</h3>
-                           <div className="table-wrapper" style={{ overflowX: 'auto' }}>
-                             <table className="admin-table" style={{ width: '100%', borderCollapse: 'collapse' }}>
-                               <thead>
-                                 <tr style={{ textAlign: 'left', borderBottom: '1px solid #eee' }}>
-                                   <th style={{ padding: '15px' }}>Técnico</th>
-                                   <th style={{ padding: '15px', textAlign: 'center' }}>Atendimentos</th>
-                                   <th style={{ padding: '15px', textAlign: 'center' }}>Volume Gerado</th>
-                                   <th style={{ padding: '15px' }}>Quota de Mercado</th>
-                                 </tr>
-                               </thead>
-                               <tbody>
-                                 {reports.technicians.map((t, idx) => {
-                                   const percent = Math.round((t.revenue / reports.revenue) * 100) || 0;
-                                   return (
-                                     <tr key={idx} style={{ borderBottom: '1px solid #f9f9f9' }}>
-                                       <td style={{ padding: '20px', fontWeight: 700, color: 'var(--primary)' }}>{t.name}</td>
-                                       <td style={{ padding: '20px', textAlign: 'center' }}>{t.count}</td>
-                                       <td style={{ padding: '20px', textAlign: 'center', fontWeight: 600 }}>{t.revenue}€</td>
-                                       <td style={{ padding: '20px' }}>
-                                         <div className="progress-bar-v3" style={{ height: '10px', background: '#f0f0f0', borderRadius: '5px', overflow: 'hidden', display: 'flex', alignItems: 'center' }}>
-                                           <div className="progress-fill" style={{ width: `${percent}%`, height: '100%', background: 'var(--primary)' }}></div>
-                                           <span style={{ marginLeft: '10px', fontSize: '0.7rem', fontWeight: 800 }}>{percent}%</span>
-                                         </div>
-                                       </td>
-                                     </tr>
-                                   );
-                                 })}
-                               </tbody>
-                             </table>
-                           </div>
-                        </div>
-
-                        <div className="report-alert mt-8" style={{ background: '#f5fdf5', border: '1px solid #dcf3dc', padding: '25px', borderRadius: '20px', display: 'flex', gap: '20px', alignItems: 'center' }}>
-                          <CheckCircle size={30} color="#2d5a27" />
-                          <div>
-                            <h4 style={{ margin: 0, color: '#2d5a27' }}>Insight Estratégico</h4>
-                            <p style={{ margin: '5px 0 0 0', fontSize: '0.9rem', opacity: 0.8 }}>O pico de faturação atual deve-se aos vouchers de flash deal. Recomenda-se manter esta estratégia para os horários de menor afluência matinal.</p>
-                          </div>
+                        <div className="svg-chart-container" style={{ height: '200px', width: '100%', position: 'relative' }}>
+                          <svg viewBox="0 0 700 200" style={{ width: '100%', height: '100%', overflow: 'visible' }}>
+                            {analytics.trends.length > 1 && (
+                              <>
+                                <defs>
+                                  <linearGradient id="areaGradient" x1="0" y1="0" x2="0" y2="1">
+                                    <stop offset="0%" stopColor="var(--primary)" stopOpacity="0.3"/>
+                                    <stop offset="100%" stopColor="var(--primary)" stopOpacity="0"/>
+                                  </linearGradient>
+                                </defs>
+                                <path 
+                                  d={`M ${analytics.trends.map((t, i) => `${(i * 100)},${180 - (t.count * 20)}`).join(' L ')} L ${(analytics.trends.length-1)*100},200 L 0,200 Z`}
+                                  fill="url(#areaGradient)"
+                                />
+                                <path 
+                                  d={`M ${analytics.trends.map((t, i) => `${(i * 100)},${180 - (t.count * 20)}`).join(' L ')}`}
+                                  fill="none" 
+                                  stroke="var(--primary)" 
+                                  strokeWidth="3"
+                                  strokeLinecap="round"
+                                  strokeLinejoin="round"
+                                />
+                                {analytics.trends.map((t, i) => (
+                                  <g key={i}>
+                                    <circle cx={i * 100} cy={180 - (t.count * 20)} r="4" fill="white" stroke="var(--primary)" strokeWidth="2" />
+                                    <text x={i * 100} y="195" fontSize="10" textAnchor="middle" fill="#999">{t.date.split('-').slice(1).join('/')}</text>
+                                    <text x={i * 100} y={170 - (t.count * 20)} fontSize="10" textAnchor="middle" fill="var(--primary)" fontWeight="700">{t.count}</text>
+                                  </g>
+                                ))}
+                              </>
+                            )}
+                            {analytics.trends.length <= 1 && <text x="350" y="100" textAnchor="middle" fill="#999">Dados insuficientes para gerar gráfico histórico.</text>}
+                          </svg>
                         </div>
                       </div>
-                    )}
+
+                      {/* Service Pie-like Chart (Horizontal Bars) */}
+                      <div className="bento-card glass-effect chart-card">
+                        <h3>Tratamentos Mais Solicitados</h3>
+                        <div className="horizontal-bar-list mt-6" style={{ display: 'flex', flexDirection: 'column', gap: '15px' }}>
+                          {analytics.services.slice(0, 5).map((s, i) => {
+                            const max = analytics.services[0]?.count || 1;
+                            const perc = (s.count / max) * 100;
+                            return (
+                              <div key={i} className="bar-row">
+                                <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.85rem', marginBottom: '5px' }}>
+                                  <span>{s.service_name}</span>
+                                  <strong>{s.count} packs</strong>
+                                </div>
+                                <div style={{ height: '8px', background: 'rgba(0,0,0,0.05)', borderRadius: '4px', overflow: 'hidden' }}>
+                                  <div style={{ height: '100%', width: `${perc}%`, background: `linear-gradient(90deg, var(--primary), var(--primary-light))`, borderRadius: '4px', transition: 'width 1s ease-out' }}></div>
+                                </div>
+                              </div>
+                            );
+                          })}
+                        </div>
+                      </div>
+
+                      {/* Technician Revenue Comparison */}
+                      <div className="bento-card glass-effect chart-card" style={{ gridColumn: 'span 2' }}>
+                        <h3>Performance por Especialista (Faturação)</h3>
+                        <div className="tech-perf-grid mt-6" style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '20px' }}>
+                           {analytics.technicians.map((t, idx) => (
+                             <div key={idx} className="tech-stat-box" style={{ padding: '20px', background: 'rgba(255,255,255,0.5)', borderRadius: '20px', border: '1px solid rgba(0,0,0,0.03)' }}>
+                               <h4 style={{ margin: 0, fontSize: '0.9rem', color: '#666' }}>{t.name}</h4>
+                               <div style={{ display: 'flex', alignItems: 'baseline', gap: '5px', marginTop: '10px' }}>
+                                 <h2 style={{ margin: 0, color: 'var(--primary)', fontSize: '1.8rem' }}>{parseFloat(t.revenue || 0).toFixed(0)}€</h2>
+                                 <small style={{ opacity: 0.6 }}>total</small>
+                               </div>
+                               <p style={{ margin: '10px 0 0 0', fontSize: '0.75rem', fontWeight: 600 }}>{t.count} serviços realizados</p>
+                             </div>
+                           ))}
+                        </div>
+                      </div>
+
+                    </div>
                   </div>
                 )}
 
@@ -1355,11 +1543,127 @@ function App() {
           </>
         )}
       </div>
-    );
-  }
+    ) : (
+      <div className="app">
+      {isMirrorOpen && (
+        <div className="mirror-overlay">
+          <div className="mirror-content animate">
+            <div className="mirror-header" style={{ padding: '20px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+               <h3 style={{ margin: 0, color: 'var(--primary)', fontWeight: 800 }}>Shakti AI Studio</h3>
+               <div className="gender-selector" style={{ background: '#eee', borderRadius: '20px', padding: '5px', display: 'flex', gap: '5px' }}>
+                 <button className={`gender-btn ${mirrorGender === 'female' ? 'active' : ''}`} onClick={() => setMirrorGender('female')} style={{ padding: '5px 15px', borderRadius: '15px', border: 'none', background: mirrorGender === 'female' ? 'var(--primary)' : 'transparent', color: mirrorGender === 'female' ? 'white' : '#666', fontSize: '0.7rem' }}>Feminino</button>
+                 <button className={`gender-btn ${mirrorGender === 'male' ? 'active' : ''}`} onClick={() => setMirrorGender('male')} style={{ padding: '5px 15px', borderRadius: '15px', border: 'none', background: mirrorGender === 'male' ? 'var(--primary)' : 'transparent', color: mirrorGender === 'male' ? 'white' : '#666', fontSize: '0.7rem' }}>Masculino</button>
+               </div>
+               <X style={{ cursor: 'pointer' }} onClick={() => setIsMirrorOpen(false)} />
+            </div>
 
-  return (
-    <div className="app">
+            <div className="mirror-studio">
+               <div className="mirror-viewport">
+                  {mirrorStage === 'choosing' && (
+                    <div className="offline-mirror-view" style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', height: '100%', background: '#f5f5f5', color: '#666', textAlign: 'center', padding: '40px' }}>
+                       <div style={{ fontSize: '3rem', marginBottom: '20px' }}>✨</div>
+                       <h4 style={{ color: 'var(--primary)', marginBottom: '10px' }}>Personalize o seu Estilo</h4>
+                       <p style={{ maxWidth: '300px', fontSize: '0.9rem', marginBottom: '30px' }}>Escolha as cores e penteados à direita e depois ligue a câmara para ver a magia.</p>
+                       <button className="btn-primary" onClick={() => setMirrorStage('camera')}>Ligar Minha Câmara</button>
+                    </div>
+                  )}
+
+                  {mirrorStage === 'camera' && (
+                    <>
+                      <video 
+                        ref={videoRef} 
+                        autoPlay 
+                        playsInline 
+                        muted 
+                        style={{ width: '100%', height: '100%', objectFit: 'cover', transform: 'scaleX(-1)' }} 
+                      />
+                      <canvas 
+                        ref={canvasRef}
+                        style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', transform: 'scaleX(-1)', pointerEvents: 'none' }}
+                      />
+                      <div className="mirror-camera-controls" style={{ position: 'absolute', bottom: '30px', left: '0', right: '0', display: 'flex', justifyContent: 'center' }}>
+                         <button className="btn-primary" style={{ padding: '15px 40px', borderRadius: '30px', boxShadow: '0 10px 30px rgba(0,0,0,0.3)', border: 'none' }} onClick={handleGenerateAILook}>📸 Tirar Foto & Aplicar IA</button>
+                      </div>
+                    </>
+                  )}
+
+                  {mirrorStage === 'result' && (
+                    <div className="ai-result-container" style={{ position: 'relative', height: '100%' }}>
+                      <img 
+                        src={capturedPhoto} 
+                        style={{ width: '100%', height: '100%', objectFit: 'cover' }} 
+                        alt="Captured"
+                      />
+                      <canvas 
+                        ref={canvasRef}
+                        style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', pointerEvents: 'none' }}
+                      />
+                      <div className="ai-photo-actions" style={{ position: 'absolute', bottom: '20px', left: '20px', right: '20px', display: 'flex', gap: '10px' }}>
+                        <button className="btn-secondary w-full" style={{ background: 'rgba(255,255,255,0.9)', border: 'none' }} onClick={() => setMirrorStage('camera')}>Refazer Foto</button>
+                        <button className="btn-primary w-full" onClick={() => openBooking({ name: `Look IA - ${mirrorHair}`, category: 'Especial', price: 'Consultar', duration: '60 min', id: 99 })}>Reservar Look</button>
+                      </div>
+                    </div>
+                  )}
+
+                  {isGeneratingLook && (
+                    <div className="ai-processing-overlay">
+                      <div className="processing-spinner"></div>
+                      <p>✨ Shakti AI a processar...</p>
+                    </div>
+                  )}
+               </div>
+
+               <div className="mirror-controls">
+                 {mirrorGender === 'female' ? (
+                   <>
+                     <div className="control-group">
+                       <label style={{ fontWeight: 700, fontSize: '0.8rem' }}>Paleta de Maquilhagem</label>
+                       <div className="color-grid mt-4" style={{ display: 'grid', gridTemplateColumns: 'repeat(5, 1fr)', gap: '10px' }}>
+                         {['#e74c3c', '#c0392b', '#9b59b6', '#f1c40f', '#ecf0f1'].map(c => (
+                           <div key={c} onClick={() => setMirrorColor(c)} style={{ width: '35px', height: '35px', borderRadius: '50%', background: c, cursor: 'pointer', border: mirrorColor === c ? '3px solid var(--primary)' : '1px solid #ddd' }}></div>
+                         ))}
+                       </div>
+                     </div>
+                     <div className="control-group mt-10">
+                       <label style={{ fontWeight: 700, fontSize: '0.8rem' }}>Penteados e Estilos AI</label>
+                       <div className="style-list mt-4">
+                          <button className={`style-btn ${mirrorHair === 'bob' ? 'active' : ''}`} onClick={() => setMirrorHair('bob')}>Short Bob Cut</button>
+                          <button className={`style-btn ${mirrorHair === 'long' ? 'active' : ''}`} onClick={() => setMirrorHair('long')}>Ondas Califórnia</button>
+                          <button className={`style-btn ${mirrorHair === 'pixie' ? 'active' : ''}`} onClick={() => setMirrorHair('pixie')}>Pixie Cut Moderno</button>
+                       </div>
+                     </div>
+                   </>
+                 ) : (
+                   <>
+                     <div className="control-group">
+                        <label style={{ fontWeight: 700, fontSize: '0.8rem' }}>Barba e Contorno AI</label>
+                        <div className="style-list mt-4">
+                           <button className={`style-btn ${mirrorHair === 'stubble' ? 'active' : ''}`} onClick={() => setMirrorHair('stubble')}>Barba de 3 dias</button>
+                           <button className={`style-btn ${mirrorHair === 'full_beard' ? 'active' : ''}`} onClick={() => setMirrorHair('full_beard')}>Barba Viking (Cheia)</button>
+                           <button className={`style-btn ${mirrorHair === 'cavanque' ? 'active' : ''}`} onClick={() => setMirrorHair('cavanque')}>Cavanque Estilo</button>
+                        </div>
+                     </div>
+                     <div className="control-group mt-10">
+                        <label style={{ fontWeight: 700, fontSize: '0.8rem' }}>Cortes e Finalização</label>
+                        <div className="style-list mt-4">
+                           <button className={`style-btn ${mirrorHair === 'fade' ? 'active' : ''}`} onClick={() => setMirrorHair('fade')}>High Fade (Degradê)</button>
+                           <button className={`style-btn ${mirrorHair === 'buzz' ? 'active' : ''}`} onClick={() => setMirrorHair('buzz')}>Buzz Cut (Rapado)</button>
+                           <button className={`style-btn ${mirrorHair === 'pompadour' ? 'active' : ''}`} onClick={() => setMirrorHair('pompadour')}>Pompadour Moderno</button>
+                        </div>
+                     </div>
+                   </>
+                 )}
+                 <div style={{ marginTop: '20px', padding: '15px', background: 'rgba(45, 90, 39, 0.05)', borderRadius: '15px' }}>
+                    <p style={{ fontSize: '0.7rem', margin: 0, opacity: 0.7 }}>Passo Atual:</p>
+                    <p style={{ fontSize: '0.9rem', fontWeight: 700, color: 'var(--primary)', margin: 0 }}>
+                       {mirrorStage === 'choosing' ? '1. Definir Estilo' : mirrorStage === 'camera' ? '2. Captura Facial' : '3. Resultado Final'}
+                    </p>
+                 </div>
+                </div>
+            </div>
+          </div>
+        </div>
+      )}
       {/* Navigation */}
       <nav className={`navbar ${scrolled ? 'nav-scrolled' : ''}`}>
         <div className="container nav-content">
@@ -1383,7 +1687,7 @@ function App() {
           <p>Um refúgio de serenidade onde a tradição Ayurveda encontra a estética moderna.</p>
           <div className="hero-btns">
             <button className="btn-primary" onClick={() => openBooking()}>Agendar Tratamento</button>
-            <button className="btn-secondary">Explorar Serviços</button>
+            <button className="btn-secondary" onClick={() => setIsMirrorOpen(true)}>✨ Look Virtual (AI)</button>
           </div>
         </div>
       </header>
@@ -1746,7 +2050,9 @@ function App() {
           </div>
         ))}
       </div>
-    </div>
+      </div>
+    )}
+  </div>
   );
 }
 

@@ -228,6 +228,15 @@ app.post('/api/bookings', async (req, res) => {
       [name, email, phone, service, technician, date, time]
     );
 
+    // 4. CRM Atomic Upsert (Silent Profile Building)
+    await connection.execute(`
+      INSERT INTO customers (name, email, phone, created_at)
+      VALUES (?, ?, ?, NOW())
+      ON DUPLICATE KEY UPDATE 
+      name = VALUES(name), 
+      phone = VALUES(phone)
+    `, [name, email, phone]);
+
     if (voucherCode) {
         await connection.execute('UPDATE vouchers SET appointment_id = ? WHERE code = ? AND appointment_id IS NULL LIMIT 1', [result.insertId, voucherCode]);
     }
@@ -256,6 +265,69 @@ app.post('/api/bookings', async (req, res) => {
     await connection.end();
     console.error('Booking error:', error);
     res.status(500).json({ success: false, message: 'Erro ao processar reserva.' });
+  }
+});
+
+// Advanced Analytics & Growth Reporting
+app.get('/api/reports/analytics', async (req, res) => {
+  const auth = req.headers.authorization || '';
+  if (auth !== 'fake-jwt-shakti-admin') return res.status(403).json({ success: false, message: 'Não autorizado' });
+
+  try {
+    const connection = await mysql.createConnection(dbConfig);
+    
+    // 1. Total Revenue (confirmed appointments * service price)
+    const [revenueRows] = await connection.execute(`
+      SELECT SUM(REPLACE(REPLACE(s.price, '€', ''), ',', '.')) as total_revenue
+      FROM appointments a
+      JOIN services s ON a.service_name = s.name
+      WHERE a.status = 'confirmed'
+    `);
+
+    // 2. Booking Trends (last 7 days)
+    const [trendRows] = await connection.execute(`
+      SELECT booking_date as date, COUNT(*) as count 
+      FROM appointments 
+      WHERE created_at >= DATE_SUB(NOW(), INTERVAL 7 DAY)
+      GROUP BY booking_date
+      ORDER BY booking_date ASC
+    `);
+
+    // 3. Service Popularity
+    const [serviceRows] = await connection.execute(`
+      SELECT service_name, COUNT(*) as count 
+      FROM appointments 
+      GROUP BY service_name 
+      ORDER BY count DESC
+    `);
+
+    // 4. Customer Retention Stats
+    const [retentionRows] = await connection.execute(`
+      SELECT 
+        (SELECT COUNT(*) FROM customers) as total_customers,
+        (SELECT COUNT(DISTINCT customer_email) FROM appointments WHERE status = 'confirmed') as active_customers
+    `);
+
+    // 5. Tech Performance
+    const [techPerfRows] = await connection.execute(`
+       SELECT t.name, COUNT(a.id) as count, SUM(REPLACE(REPLACE(s.price, '€', ''), ',', '.')) as revenue
+       FROM technicians t
+       LEFT JOIN appointments a ON t.id = a.technician_id AND a.status = 'confirmed'
+       LEFT JOIN services s ON a.service_name = s.name
+       GROUP BY t.id
+    `);
+
+    await connection.end();
+
+    res.json({
+      revenue: parseFloat(revenueRows[0].total_revenue || 0).toFixed(2),
+      trends: trendRows,
+      services: serviceRows,
+      customers: retentionRows[0],
+      technicians: techPerfRows
+    });
+  } catch (error) {
+    res.status(500).json({ success: false, error: error.message });
   }
 });
 
@@ -622,7 +694,7 @@ app.post('/api/bookings/:id/promote', async (req, res) => {
           <h1 style="background: #2d5a27; color: white; display: inline-block; padding: 12px 25px; border-radius: 8px; letter-spacing: 2px;">${vCode}</h1>
         </div>
         <p style="text-align: center; margin-top: 20px;">
-          <a href="http://improving-photographs-exemption-gave.trycloudflare.com" 
+          <a href="https://counter-mic-launched-informal.trycloudflare.com" 
              style="background: #e4c59e; color: #2d5a27; padding: 10px 20px; text-decoration: none; border-radius: 5px; font-weight: bold;">Reservar Já</a>
         </p>
       </div>
@@ -727,7 +799,7 @@ app.post('/api/vouchers/promote-empty', async (req, res) => {
           <p style="font-size: 0.8rem; color: #999; margin-top: 10px;">*Válido apenas nos próximos ${validityMin} minutos!</p>
         </div>
         <p style="text-align: center; margin-top: 25px;">
-          <a href="http://improving-photographs-exemption-gave.trycloudflare.com" 
+          <a href="https://counter-mic-launched-informal.trycloudflare.com" 
              style="background: #e4c59e; color: #2d5a27; padding: 12px 30px; text-decoration: none; border-radius: 8px; font-weight: bold; border: 1px solid #2d5a27;">Agendar Agora</a>
         </p>
       </div>
@@ -928,20 +1000,25 @@ app.get('/api/customers', async (req, res) => {
   try {
     const connection = await mysql.createConnection(dbConfig);
     let query = `
-      SELECT c.*, 
-        (SELECT COUNT(*) FROM appointments WHERE customer_email = c.email AND status = 'confirmed') as total_bookings,
-        (SELECT MAX(booking_date) FROM appointments WHERE customer_email = c.email AND status = 'confirmed') as last_visit,
-        (SELECT SUM(CAST(REPLACE(s.price, '€', '') AS DECIMAL)) 
-         FROM appointments a 
-         JOIN services s ON a.service_name = s.name 
-         WHERE a.customer_email = c.email AND a.status = 'confirmed') as total_spent
+      SELECT 
+        c.*, 
+        COUNT(DISTINCT a.id) as total_bookings,
+        SUM(CASE WHEN a.status = 'confirmed' THEN REPLACE(REPLACE(s.price, '€', ''), ',', '.') ELSE 0 END) as total_spent,
+        MAX(CASE WHEN a.status = 'confirmed' THEN a.booking_date ELSE NULL END) as last_visit
       FROM customers c
+      LEFT JOIN appointments a ON c.email = a.customer_email
+      LEFT JOIN services s ON a.service_name = s.name
+      WHERE 1=1
     `;
     let params = [];
+
     if (search) {
-      query += ' WHERE c.name LIKE ? OR c.email LIKE ?';
-      params = [`%${search}%`, `%${search}%` ];
+      query += ' AND (c.name LIKE ? OR c.email LIKE ? OR c.phone LIKE ?)';
+      params.push(`%${search}%`, `%${search}%`, `%${search}%`);
     }
+
+    query += ' GROUP BY c.id ORDER BY last_visit DESC, total_bookings DESC';
+
     const [rows] = await connection.execute(query, params);
     await connection.end();
     res.json(rows);
@@ -962,7 +1039,7 @@ app.patch('/api/customers/:id', async (req, res) => {
       await connection.execute('UPDATE customers SET anamnesis = ? WHERE id = ?', [JSON.stringify(anamnesis), id]);
     }
     await connection.end();
-    res.json({ success: true, message: 'Ficha de cliente atualizada.' });
+    res.json({ success: true, message: 'Dados do cliente atualizados!' });
   } catch (error) {
     res.status(500).json({ success: false, error: error.message });
   }
