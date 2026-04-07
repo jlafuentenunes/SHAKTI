@@ -224,7 +224,7 @@
 .hero {
   min-height: 100vh;
   width: 100%;
-  background: url('https://images.unsplash.com/photo-1540555700478-4be289fbecee?auto=format&fit=crop&q=80&w=2000') center/cover no-repeat;
+  background: url('https://images.unsplash.com/photo-1620733723572-12c03f99e326?auto=format&fit=crop&q=80&w=2000') center/cover no-repeat;
   display: flex;
   align-items: center;
   position: relative;
@@ -238,7 +238,7 @@
   left: 0;
   width: 100%;
   height: 100%;
-  background: linear-gradient(to right, rgba(255, 254, 252, 0.85) 0%, rgba(255, 254, 252, 0.4) 100%);
+  background: linear-gradient(135deg, rgba(255, 254, 252, 0.7) 0%, rgba(255, 254, 252, 0.1) 100%);
 }
 
 .hero-content {
@@ -893,19 +893,46 @@
     left: 0;
     width: 100%;
     height: 100vh;
-    background: white;
+    background: rgba(255, 255, 255, 0.95);
+    backdrop-filter: blur(20px);
+    -webkit-backdrop-filter: blur(20px);
     flex-direction: column;
-    padding: 2rem;
+    padding: 0;
     z-index: 5000;
-    gap: 2rem;
     align-items: center;
     justify-content: center;
-    animation: slideIn 0.3s ease-out;
+    gap: 2.5rem;
+    animation: fadeInMenu 0.4s ease-out;
   }
   
-  @keyframes slideIn {
-    from { transform: translateY(-100%); }
-    to { transform: translateY(0); }
+  .nav-links.mobile-active .mobile-header {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    padding: 1.5rem;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+  }
+
+  .nav-links.mobile-active a {
+    font-size: 1.5rem;
+    font-weight: 300;
+    color: var(--text-dark);
+  }
+
+  .nav-links.mobile-active .btn-primary {
+    font-size: 1.2rem;
+    padding: 1rem 2rem;
+    margin-top: 1rem;
+    width: 80%;
+    max-width: 300px;
+  }
+  
+  @keyframes fadeInMenu {
+    from { opacity: 0; transform: translateY(-10px); }
+    to { opacity: 1; transform: translateY(0); }
   }
 }
 
@@ -1472,9 +1499,13 @@
 
 .admin-container {
   min-height: 100vh;
-  background: linear-gradient(135deg, #f0f2f0 0%, #e8e9e7 100%);
+  background: 
+    linear-gradient(135deg, rgba(240, 242, 240, 0.94) 0%, rgba(232, 233, 231, 0.94) 100%),
+    url('https://images.unsplash.com/photo-1620733723572-12c03f99e326?auto=format&fit=crop&q=80&w=2000');
+  background-attachment: fixed;
+  background-size: cover;
   display: flex;
-  overflow-x: hidden; /* Prevent horizontal spill */
+  overflow-x: hidden;
 }
 
 .admin-sidebar {
