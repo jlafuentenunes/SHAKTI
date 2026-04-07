@@ -279,7 +279,7 @@ app.get('/api/reports/analytics', async (req, res) => {
     
     // 1. Total Revenue (confirmed appointments * service price)
     const [revenueRows] = await connection.execute(`
-      SELECT SUM(REPLACE(REPLACE(s.price, '€', ''), ',', '.')) as total_revenue
+      SELECT COALESCE(SUM(CAST(REPLACE(REPLACE(s.price, '€', ''), ',', '.') AS DECIMAL(10,2))), 0) as total_revenue
       FROM appointments a
       JOIN services s ON a.service_name = s.name
       WHERE a.status = 'confirmed'

@@ -1,3 +1,4 @@
+import { BrowserRouter } from 'react-router-dom'
 import { StrictMode } from 'react'
 import { createRoot } from 'react-dom/client'
 import './index.css'
@@ -6,8 +7,10 @@ import { MirrorProvider } from './features/mirror/MirrorContext.jsx'
 
 createRoot(document.getElementById('root')).render(
   <StrictMode>
-    <MirrorProvider>
-      <App />
-    </MirrorProvider>
+    <BrowserRouter>
+      <MirrorProvider>
+        <App />
+      </MirrorProvider>
+    </BrowserRouter>
   </StrictMode>,
 )

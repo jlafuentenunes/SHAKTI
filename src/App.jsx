@@ -5,6 +5,7 @@ import {
   LogOut, RefreshCcw, DollarSign, TrendingUp, Info, AlertTriangle,
   CheckSquare, Package, Zap, Camera, BarChart2
 } from 'lucide-react';
+import { Routes, Route, useNavigate, useLocation, Navigate } from 'react-router-dom';
 
 // Services & Components
 import { api } from './services/api';
@@ -506,158 +507,144 @@ function App() {
       setIsSubmitting(false);
     }
   };
+  const navigate = useNavigate();
+  const location = useLocation();
+
+  // Sync view state with URL (optional but helpful for some components)
+  useEffect(() => {
+    if (location.pathname.startsWith('/admin')) {
+      setView('admin');
+    } else {
+      setView('client');
+    }
+  }, [location.pathname]);
+
   return (
     <div className="shakti-app">
-      {view === 'admin' ? (
-        <div className="admin-container">
-        {!isLoggedIn ? (
-          <div className="admin-login-box-wrapper w-full">
-            <div className="admin-login-box animate-in">
-              <h2>Shakti Admin Login</h2>
-              <form onSubmit={handleLogin}>
-                <div className="form-group">
-                  <label>Utilizador</label>
-                  <input type="text" className="input-field" value={loginForm.user} onChange={e => setLoginForm({...loginForm, user: e.target.value})} />
-                </div>
-                <div className="form-group">
-                  <label>Palavra-passe</label>
-                  <input type="password" className="input-field" value={loginForm.password} onChange={e => setLoginForm({...loginForm, password: e.target.value})} />
-                </div>
-                <button className="btn-primary w-full" disabled={isSubmitting}>Entrar</button>
-                <button type="button" className="btn-secondary w-full mt-2" onClick={() => setView('client')}>Voltar ao Site</button>
-              </form>
-            </div>
-          </div>
-        ) : (
-          <>
-            <Sidebar 
-              adminTab={adminTab} setAdminTab={setAdminTab} 
-              userRole={userRole} fetchAppointments={fetchAppointments} 
-              handleLogout={handleLogout} 
+      <Routes>
+        {/* CLIENT ROUTE */}
+        <Route path="/" element={
+          <div className="app">
+            <Hero scrolled={scrolled} onBooking={openBooking} onMirror={setIsMirrorOpen} />
+            <ServicesPage services={services} onBooking={openBooking} />
+            <About />
+            <Contact 
+              contactForm={contactForm} setContactForm={setContactForm} 
+              handleContactSubmit={handleContactSubmit} isSubmitting={isSubmitting} 
             />
+            <Footer onAdminLogin={() => navigate('/admin')} />
+            <AIMirrorModal onBooking={openBooking} />
+            <BookingModal 
+              isOpen={isBookingOpen} onClose={() => setIsBookingOpen(false)} 
+              services={services} technicians={technicians} timeSlots={timeSlots} 
+              bookingForm={bookingForm} setBookingForm={setBookingForm} 
+              bookingStep={bookingStep} setBookingStep={setBookingStep} 
+              handleBookingSubmit={handleBookingSubmit} isSubmitting={isSubmitting} 
+            />
+          </div>
+        } />
 
-            <main className="admin-main">
-              <AdminHeader 
-                adminTab={adminTab} userRole={userRole} 
-                technicians={technicians} userTechId={userTechId} 
-              />
-
-              <div className="admin-content-area">
-                {adminTab === 'table' && (
-                  <AppointmentsTab 
-                    appointments={appointments} technicians={technicians} 
-                    services={services} analytics={analytics} 
-                    updateBookingStatus={updateBookingStatus} handlePromote={handlePromote} 
-                    notify={notify} 
-                  />
-                )}
-
-                {adminTab === 'calendar' && (
-                  <CalendarTab 
-                    calendarDate={calendarDate} setCalendarDate={setCalendarDate} 
-                    userRole={userRole} technicians={technicians} 
-                    selectedCalendarTechId={selectedCalendarTechId} 
-                    setSelectedCalendarTechId={setSelectedCalendarTechId} 
-                    appointments={appointments} timeSlots={timeSlots} 
-                    blockouts={blockouts} handleBlockSlot={handleBlockSlot} 
-                    handlePromoteEmpty={handlePromoteEmpty} 
-                  />
-                )}
-
-                {adminTab === 'technicians' && (
-                  <TechniciansTab 
-                    technicians={technicians} appointments={appointments} 
-                    services={services} updateHourlyRate={updateHourlyRate} 
-                    fetchTechnicians={fetchTechnicians} 
-                  />
-                )}
-
-                {adminTab === 'services' && (
-                  <ServicesTab 
-                    services={services} technicians={technicians} 
-                    serviceSearch={serviceSearch} setServiceSearch={setServiceSearch} 
-                    showDeletedServices={showDeletedServices} 
-                    setShowDeletedServices={setShowDeletedServices} 
-                    createService={createService} softDeleteService={softDeleteService} 
-                    restoreService={restoreService} hardDeleteService={hardDeleteService} 
-                    vouchers={vouchers} deleteVoucher={deleteVoucher} 
-                    createManualVoucher={createManualVoucher} notify={notify} 
-                    fetchServicesFromDB={fetchServicesFromDB} 
-                  />
-                )}
-
-                {adminTab === 'customers' && (
-                  <CustomersTab 
-                    customers={customers} customerSearch={customerSearch} 
-                    setCustomerSearch={setCustomerSearch} appointments={appointments} 
-                    updateCustomer={updateCustomer} 
-                  />
-                )}
-
-                {adminTab === 'reports' && (
-                  <ReportsTab 
-                    analytics={analytics} fetchAnalytics={fetchAnalytics} 
-                  />
-                )}
-
-                {adminTab === 'settings' && (
-                  <SettingsTab 
-                    settings={settings} updateSettings={updateSettings} 
-                  />
-                )}
-
-                {adminTab === 'mirror' && (
-                  <div className="admin-mirror-container animate-in" style={{ height: '75vh', maxHeight: '800px', background: 'white', borderRadius: '20px', overflow: 'hidden' }}>
-                    <MirrorStudio variant="admin" onBooking={openBooking} />
-                  </div>
-                )}
+        {/* ADMIN ROUTE */}
+        <Route path="/admin" element={
+          <div className="admin-container">
+            {!isLoggedIn ? (
+              <div className="admin-login-box-wrapper w-full">
+                <div className="admin-login-box animate-in">
+                  <h2>Shakti Admin Login</h2>
+                  <form onSubmit={handleLogin}>
+                    <div className="form-group">
+                      <label>Utilizador</label>
+                      <input type="text" className="input-field" value={loginForm.user} onChange={e => setLoginForm({...loginForm, user: e.target.value})} />
+                    </div>
+                    <div className="form-group">
+                      <label>Palavra-passe</label>
+                      <input type="password" className="input-field" value={loginForm.password} onChange={e => setLoginForm({...loginForm, password: e.target.value})} />
+                    </div>
+                    <button className="btn-primary w-full" disabled={isSubmitting}>Entrar</button>
+                    <button type="button" className="btn-secondary w-full mt-2" onClick={() => navigate('/')}>Voltar ao Site</button>
+                  </form>
+                </div>
               </div>
-            </main>
-          </>
-        )}
-      </div>
-    ) : (
-      <div className="app">
-        <Hero 
-          scrolled={scrolled} 
-          onBooking={openBooking} 
-          onMirror={setIsMirrorOpen} 
-        />
-        
-        <ServicesPage 
-          services={services} 
-          onBooking={openBooking} 
-        />
-        
-        <About />
-        
-        <Contact 
-          contactForm={contactForm} 
-          setContactForm={setContactForm} 
-          handleContactSubmit={handleContactSubmit} 
-          isSubmitting={isSubmitting} 
-        />
-        
-        <Footer 
-          onAdminLogin={() => setView('admin')} 
-        />
-        
-        <AIMirrorModal onBooking={openBooking} />
-        <BookingModal 
-          isOpen={isBookingOpen} 
-          onClose={() => setIsBookingOpen(false)} 
-          services={services} 
-          technicians={technicians} 
-          timeSlots={timeSlots} 
-          bookingForm={bookingForm} 
-          setBookingForm={setBookingForm} 
-          bookingStep={bookingStep} 
-          setBookingStep={setBookingStep} 
-          handleBookingSubmit={handleBookingSubmit} 
-          isSubmitting={isSubmitting} 
-        />
-      </div>
-    )}
+            ) : (
+              <>
+                <Sidebar 
+                  adminTab={adminTab} setAdminTab={setAdminTab} 
+                  userRole={userRole} fetchAppointments={fetchAppointments} 
+                  handleLogout={handleLogout} 
+                />
+                <main className="admin-main">
+                  <AdminHeader 
+                    adminTab={adminTab} userRole={userRole} 
+                    technicians={technicians} userTechId={userTechId} 
+                  />
+                  <div className="admin-content-area">
+                    {adminTab === 'table' && (
+                      <AppointmentsTab 
+                        appointments={appointments} technicians={technicians} 
+                        services={services} analytics={analytics} 
+                        updateBookingStatus={updateBookingStatus} handlePromote={handlePromote} 
+                        notify={notify} 
+                      />
+                    )}
+                    {adminTab === 'calendar' && (
+                      <CalendarTab 
+                        calendarDate={calendarDate} setCalendarDate={setCalendarDate} 
+                        userRole={userRole} technicians={technicians} 
+                        selectedCalendarTechId={selectedCalendarTechId} 
+                        setSelectedCalendarTechId={setSelectedCalendarTechId} 
+                        appointments={appointments} timeSlots={timeSlots} 
+                        blockouts={blockouts} handleBlockSlot={handleBlockSlot} 
+                        handlePromoteEmpty={handlePromoteEmpty} 
+                      />
+                    )}
+                    {adminTab === 'technicians' && (
+                      <TechniciansTab 
+                        technicians={technicians} appointments={appointments} 
+                        services={services} updateHourlyRate={updateHourlyRate} 
+                        fetchTechnicians={fetchTechnicians} 
+                      />
+                    )}
+                    {adminTab === 'services' && (
+                      <ServicesTab 
+                        services={services} technicians={technicians} 
+                        serviceSearch={serviceSearch} setServiceSearch={setServiceSearch} 
+                        showDeletedServices={showDeletedServices} 
+                        setShowDeletedServices={setShowDeletedServices} 
+                        createService={createService} softDeleteService={softDeleteService} 
+                        restoreService={restoreService} hardDeleteService={hardDeleteService} 
+                        vouchers={vouchers} deleteVoucher={deleteVoucher} 
+                        createManualVoucher={createManualVoucher} notify={notify} 
+                        fetchServicesFromDB={fetchServicesFromDB} 
+                      />
+                    )}
+                    {adminTab === 'customers' && (
+                      <CustomersTab 
+                        customers={customers} customerSearch={customerSearch} 
+                        setCustomerSearch={setCustomerSearch} appointments={appointments} 
+                        updateCustomer={updateCustomer} 
+                      />
+                    )}
+                    {adminTab === 'reports' && (
+                      <ReportsTab analytics={analytics} fetchAnalytics={fetchAnalytics} />
+                    )}
+                    {adminTab === 'settings' && (
+                      <SettingsTab settings={settings} updateSettings={updateSettings} />
+                    )}
+                    {adminTab === 'mirror' && (
+                      <div className="admin-mirror-container animate-in">
+                        <MirrorStudio variant="admin" onBooking={openBooking} />
+                      </div>
+                    )}
+                  </div>
+                </main>
+              </>
+            )}
+          </div>
+        } />
+
+        {/* CATCH ALL */}
+        <Route path="*" element={<Navigate to="/" replace />} />
+      </Routes>
     <ToastContainer toasts={toasts} onRemove={(id) => setToasts(prev => prev.filter(t => t.id !== id))} />
   </div>
   );

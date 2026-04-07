@@ -10,7 +10,7 @@ const AppointmentsTab = ({
     <>
       <div className="admin-stats-grid">
         <StatCard 
-          title="Faturação Bruta" value={`${analytics.revenue}€`} 
+          title="Faturação Bruta" value={`${Number(analytics.revenue || 0).toFixed(2)}€`} 
           icon={<DollarSign size={20} />} iconBg="rgba(45, 90, 39, 0.1)" iconColor="var(--primary)" 
         />
         <StatCard 
@@ -22,7 +22,7 @@ const AppointmentsTab = ({
           icon={<Calendar size={20} />} iconBg="rgba(52, 152, 219, 0.1)" iconColor="#3498db" 
         />
         <StatCard 
-          title="LTV Médio" value={`${(analytics.revenue / (analytics.customers?.total_customers || 1)).toFixed(2)}€`} 
+          title="LTV Médio" value={`${(Number(analytics.revenue || 0) / (analytics.customers?.total_customers || 1)).toFixed(2)}€`} 
           icon={<TrendingUp size={20} />} iconBg="rgba(155, 89, 182, 0.1)" iconColor="#9b59b6" 
         />
       </div>
