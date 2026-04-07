@@ -17,21 +17,21 @@ const Services = ({ services, onBooking }) => {
           <h3 className="category-title">{cat}</h3>
           <div className="services-grid">
             {services.filter(s => s.category === cat && !s.deleted_at).map(service => (
-              <div key={service.id} className="service-card glass-effect hover-float flex-col items-start gap-4" style={{ padding: 0, overflow: 'hidden' }}>
-                <div className="service-img-wrapper w-full" style={{ height: '180px', overflow: 'hidden' }}>
+              <div key={service.id} className="service-card glass-effect hover-float">
+                <div className="service-img-wrapper">
                   <img 
                     src={service.image_url || 'https://images.unsplash.com/photo-1544161515-4af6b1d8e1a9?auto=format&fit=crop&q=80&w=400'} 
                     alt={service.name} 
-                    style={{ width: '100%', height: '100%', objectFit: 'cover' }}
+                    className="service-img"
                   />
                 </div>
-                <div className="service-body p-6 w-full">
-                  <div className="service-header flex justify-between items-center mb-2">
-                    <h4 className="m-0 text-lg font-bold">{service.name}</h4>
-                    <span className="price font-medium text-primary">{service.price}</span>
+                <div className="service-body">
+                  <div className="service-header">
+                    <h4>{service.name}</h4>
+                    <span className="price">{service.price}</span>
                   </div>
-                  <p className="service-desc text-sm text-gray-500 mb-6">{service.duration} de puro relaxamento e bem-estar.</p>
-                  <button className="service-btn w-full btn-secondary text-sm py-3" onClick={() => onBooking(service)}>
+                  <p className="service-desc">{service.duration} de puro relaxamento e bem-estar.</p>
+                  <button className="service-btn w-full btn-secondary" onClick={() => onBooking(service)}>
                     Reservar <ChevronRight size={14} />
                   </button>
                 </div>

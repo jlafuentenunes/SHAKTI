@@ -7,11 +7,11 @@ const About = () => {
       <div className="about-grid">
         <div className="about-image">
           <div className="image-stack">
-            <div className="img-large glass-card rounded-2xl overflow-hidden">
-               <img src="https://images.unsplash.com/photo-1544161515-4af6b1d8e1a9?auto=format&fit=crop&q=80&w=800" alt="Spa" />
+            <div className="img-large rounded-2xl overflow-hidden shadow-xl">
+               <img src="https://images.unsplash.com/photo-1620733723572-12c03f99e326?auto=format&fit=crop&q=80&w=800" alt="Spa" />
             </div>
             <div className="img-small floating rounded-2xl overflow-hidden border-4 border-white shadow-2xl">
-               <img src="https://images.unsplash.com/photo-1512290923902-8a9f81dc2069?auto=format&fit=crop&q=80&w=400" alt="Ayurveda" />
+               <img src="https://images.unsplash.com/photo-1600334089648-b0d9d3028eb2?auto=format&fit=crop&q=80&w=400" alt="Ayurveda" />
             </div>
           </div>
         </div>
