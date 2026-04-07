@@ -12,7 +12,7 @@ Transformar a **Shakti Home** (Apúlia Coast Wellness) num refúgio digital de b
 - **Backend:** Node.js Express (API de marcações e contactos).
 - **Base de Dados:** MySQL (Rodando em Docker).
 - **Notificações:** Nodemailer (Configurado para @monitordesurpresas.pt).
-- **Exposição:** Cloudflare Tunnel (Acesso remoto via `trycloudflare.com`).
+- **Exposição:** Cloudflare Tunnel (Acesso remoto via [https://empirical-enhanced-vip-hawaiian.trycloudflare.com](https://empirical-enhanced-vip-hawaiian.trycloudflare.com)).
 
 ---
 
@@ -42,6 +42,10 @@ Transformar a **Shakti Home** (Apúlia Coast Wellness) num refúgio digital de b
 
 ### 4. Pagamentos (Opcional)
 - [ ] Estudar integração de MBWAY/Stripe para pré-reservas.
+3. 
+### 5. Estúdio de Imagem (AI Mirror)
+- [ ] Integrar o AI Beauty Mirror no Painel de Administração para apoio em consultas presenciais.
+- [ ] Refinar as sobreposições de AR (cabelo, barba, maquilhagem) para maior realismo.
 
 ---
 

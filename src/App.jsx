@@ -1,95 +1,60 @@
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { 
-  Calendar, 
-  MapPin, 
-  Phone, 
-  Clock, 
-  User, 
-  ChevronRight, 
-  ChevronLeft,
-  CheckCircle2,
-  Menu,
-  X,
-  Mail,
-  LayoutDashboard,
-  Users,
-  Settings,
-  LogOut,
-  RefreshCcw,
-  DollarSign,
-  TrendingUp,
-  Info,
-  AlertTriangle,
-  CheckSquare,
-  Package,
-  Zap,
-  Camera,
-  BarChart2
+  Calendar, MapPin, Phone, Clock, User, ChevronRight, ChevronLeft,
+  CheckCircle2, Menu, X, Mail, LayoutDashboard, Users, Settings,
+  LogOut, RefreshCcw, DollarSign, TrendingUp, Info, AlertTriangle,
+  CheckSquare, Package, Zap, Camera, BarChart2
 } from 'lucide-react';
 
-const Facebook = ({ size = 24, ...props }) => (
-  <svg
-    xmlns="http://www.w3.org/2000/svg"
-    width={size}
-    height={size}
-    viewBox="0 0 24 24"
-    fill="none"
-    stroke="currentColor"
-    strokeWidth="2"
-    strokeLinecap="round"
-    strokeLinejoin="round"
-    {...props}
-  >
-    <path d="M18 2h-3a5 5 0 0 0-5 5v3H7v4h3v8h4v-8h3l1-4h-4V7a1 1 0 0 1 1-1h3z" />
-  </svg>
-);
+// Services & Components
+import { api } from './services/api';
+import { useMirror } from './features/mirror/MirrorContext';
+import Sidebar from './features/admin/Sidebar';
+import AdminHeader from './features/admin/AdminHeader';
+import StatCard from './components/StatCard';
+import { ToastContainer } from './components/Toast';
+import AIMirrorModal from './features/mirror/AIMirrorModal';
+import MirrorStudio from './features/mirror/MirrorStudio';
 
-const Instagram = ({ size = 24, ...props }) => (
-  <svg
-    xmlns="http://www.w3.org/2000/svg"
-    width={size}
-    height={size}
-    viewBox="0 0 24 24"
-    fill="none"
-    stroke="currentColor"
-    strokeWidth="2"
-    strokeLinecap="round"
-    strokeLinejoin="round"
-    {...props}
-  >
-    <rect width="20" height="20" x="2" y="2" rx="5" ry="5" />
-    <path d="M16 11.37A4 4 0 1 1 12.63 8 4 4 0 0 1 16 11.37z" />
-    <line x1="17.5" x2="17.51" y1="6.5" y2="6.5" />
-  </svg>
-);
+// Admin Tabs
+import AppointmentsTab from './features/admin/tabs/AppointmentsTab';
+import CalendarTab from './features/admin/tabs/CalendarTab';
+import ServicesTab from './features/admin/tabs/ServicesTab';
+import TechniciansTab from './features/admin/tabs/TechniciansTab';
+import ReportsTab from './features/admin/tabs/ReportsTab';
+import BookingModal from './features/booking/BookingModal';
 
+import Hero from './components/sections/Hero';
+import ServicesPage from './components/sections/Services';
+import About from './components/sections/About';
+import Contact from './components/sections/Contact';
+import Footer from './components/sections/Footer';
 import './App.css';
 
 // services will be loaded from DB
 
 function App() {
   const [isBookingOpen, setIsBookingOpen] = useState(false);
-  const [bookingStep, setBookingStep] = useState(1);
-  const [selectedService, setSelectedService] = useState(null);
-  const [scrolled, setScrolled] = useState(false);
-  const [formData, setFormData] = useState({
+  const [bookingForm, setBookingForm] = useState({
+    service_id: null,
+    service_name: '',
+    price: '',
+    date: new Date().toISOString().split('T')[0],
+    time: '',
     name: '',
     email: '',
     phone: '',
-    date: '2026-04-05',
-    time: ''
+    promoCode: '',
+    discount: 0
   });
+
   const [view, setView] = useState('client'); // 'client' or 'admin'
-  const [isMirrorOpen, setIsMirrorOpen] = useState(false);
-  const [mirrorColor, setMirrorColor] = useState('#e74c3c');
-  const [mirrorHair, setMirrorHair] = useState('none');
-  const [mirrorGender, setMirrorGender] = useState('female');
+  const { setIsMirrorOpen, mirrorStage, setMirrorStage } = useMirror();
   const [isSubmitting, setIsSubmitting] = useState(false);
-  const [busySlots, setBusySlots] = useState([]);
   const [appointments, setAppointments] = useState([]);
   const [isLoggedIn, setIsLoggedIn] = useState(!!localStorage.getItem('shakti-token'));
   const [loginForm, setLoginForm] = useState({ user: '', password: '' });
-  const [adminTab, setAdminTab] = useState('table'); // 'table' or 'calendar'
+  const [adminTab, setAdminTab] = useState('table');
   const [calendarDate, setCalendarDate] = useState(new Date().toISOString().split('T')[0]);
   const [userRole, setUserRole] = useState(localStorage.getItem('shakti-role') || 'client');
   const [userTechId, setUserTechId] = useState(localStorage.getItem('shakti-tech-id'));
@@ -99,8 +64,6 @@ function App() {
   const [showDeletedServices, setShowDeletedServices] = useState(false);
   const [vouchers, setVouchers] = useState([]);
   const [blockouts, setBlockouts] = useState([]);
-  const [reports, setReports] = useState(null);
-  const [reportRange, setReportRange] = useState({ start: '', end: '' });
   const [customers, setCustomers] = useState([]);
   const [selectedCustomer, setSelectedCustomer] = useState(null);
   const [customerSearch, setCustomerSearch] = useState('');
@@ -108,125 +71,8 @@ function App() {
   const [analytics, setAnalytics] = useState({ revenue: 0, trends: [], services: [], customers: { total_customers: 0, active_customers: 0 }, technicians: [] });
   const [selectedCalendarTechId, setSelectedCalendarTechId] = useState(null);
   const [isMobile, setIsMobile] = useState(window.innerWidth < 768);
-
-  const videoRef = React.useRef(null);
-  const canvasRef = React.useRef(null);
-  const resultsRef = React.useRef(null);
-  const logoRef = React.useRef(null);
-  const [isGeneratingLook, setIsGeneratingLook] = useState(false);
-  const [capturedPhoto, setCapturedPhoto] = useState(null);
-  const [capturedLandmarks, setCapturedLandmarks] = useState(null);
-  const [mirrorStage, setMirrorStage] = useState('choosing'); // 'choosing', 'camera', 'result'
-  const isPhotoView = mirrorStage === 'result';
-
-  useEffect(() => {
-    if (isMirrorOpen && mirrorStage !== 'choosing' && window.FaceMesh) {
-      const faceMesh = new window.FaceMesh({
-        locateFile: (file) => `https://cdn.jsdelivr.net/npm/@mediapipe/face_mesh/${file}`
-      });
-
-      faceMesh.setOptions({
-        maxNumFaces: 1,
-        refineLandmarks: true,
-        minDetectionConfidence: 0.5,
-        minTrackingConfidence: 0.5
-      });
-
-      const LIPS_OUTER = [61, 146, 91, 181, 84, 17, 314, 405, 321, 375, 291, 308, 324, 318, 402, 317, 14, 87, 178, 88, 95];
-      const FACE_OVAL = [10, 338, 297, 332, 284, 251, 389, 356, 454, 323, 361, 288, 397, 365, 379, 378, 400, 377, 152, 148, 176, 149, 150, 136, 172, 58, 132, 93, 234, 127, 162, 21, 54, 103, 67, 109];
-
-      const drawAR = (results) => {
-        if (!canvasRef.current) return;
-        const canvas = canvasRef.current;
-        const ctx = canvas.getContext('2d');
-        ctx.clearRect(0, 0, canvas.width, canvas.height);
-          
-        if (results && results[0]) {
-             const m = results[0];
-             const w = canvas.width;
-             const h = canvas.height;
-
-             if (mirrorGender === 'female' && mirrorColor !== '#ecf0f1') {
-                ctx.fillStyle = mirrorColor;
-                ctx.globalAlpha = 0.55;
-                ctx.beginPath();
-                LIPS_OUTER.forEach((idx, i) => {
-                  const pt = m[idx];
-                  if (i === 0) ctx.moveTo(pt.x * w, pt.y * h);
-                  else ctx.lineTo(pt.x * w, pt.y * h);
-                });
-                ctx.closePath();
-                ctx.fill();
-                ctx.globalAlpha = 1.0;
-             }
-
-             if (mirrorHair !== 'none') {
-                ctx.beginPath();
-                if (mirrorGender === 'male' && mirrorHair.includes('beard')) {
-                  ctx.fillStyle = 'rgba(40, 25, 10, 0.7)';
-                  const BEARD_LANDMARKS = [152, 148, 176, 149, 150, 136, 172, 58, 132, 93, 234, 127, 21, 54, 103, 67, 109, 10, 338, 297, 332, 284, 251, 389, 356, 454, 323, 361, 288, 397, 365, 379, 378, 400, 377, 152];
-                  BEARD_LANDMARKS.forEach((idx, i) => {
-                    const pt = m[idx];
-                    if (i === 0) ctx.moveTo(pt.x * w, pt.y * h);
-                    else ctx.lineTo(pt.x * w, pt.y * h);
-                  });
-                  ctx.fill();
-                } else if (mirrorGender === 'female') {
-                  ctx.fillStyle = 'rgba(60, 30, 15, 0.5)';
-                  ctx.beginPath();
-                  const TOP_HEAD = [10, 338, 297, 332, 284, 251, 389, 356, 454];
-                  const firstPt = m[10];
-                  ctx.moveTo(firstPt.x * w, (firstPt.y - 0.15) * h);
-                  TOP_HEAD.forEach((idx) => {
-                    const pt = m[idx];
-                    ctx.lineTo(pt.x * w, (pt.y - 0.1) * h);
-                  });
-                  if (mirrorHair === 'long') {
-                    ctx.lineTo(m[454].x * w + 40, m[454].y * h + 200);
-                    ctx.lineTo(m[234].x * w - 40, m[234].y * h + 200);
-                  } else if (mirrorHair === 'bob') {
-                    ctx.lineTo(m[454].x * w + 30, m[454].y * h + 60);
-                    ctx.lineTo(m[234].x * w - 30, m[234].y * h + 60);
-                  }
-                  ctx.closePath();
-                  ctx.fill();
-                }
-             }
-        }
-      };
-
-      faceMesh.onResults((results) => {
-        resultsRef.current = results;
-        if (!isPhotoView) {
-          if (canvasRef.current && videoRef.current) {
-            const video = videoRef.current;
-            if (canvasRef.current.width !== video.videoWidth) {
-              canvasRef.current.width = video.videoWidth || 640;
-              canvasRef.current.height = video.videoHeight || 480;
-            }
-          }
-          drawAR(results.multiFaceLandmarks);
-        }
-      });
-
-      if (isPhotoView && capturedLandmarks) {
-        drawAR([capturedLandmarks]);
-      }
-
-      const camera = new window.Camera(videoRef.current, {
-        onFrame: async () => {
-          if (!isPhotoView) {
-            await faceMesh.send({image: videoRef.current});
-          }
-        },
-        width: 640,
-        height: 480
-      });
-      camera.start();
-
-      return () => { camera.stop(); faceMesh.close(); };
-    }
-  }, [isMirrorOpen, mirrorHair, mirrorColor, mirrorGender, mirrorStage, isPhotoView, capturedLandmarks]);
+  const [scrolled, setScrolled] = useState(false);
+  const [bookingStep, setBookingStep] = useState(1);
 
   const [contactForm, setContactForm] = useState({
     name: '',
@@ -245,15 +91,10 @@ function App() {
     }, 4000);
   };
 
-  const [promoCode, setPromoCode] = useState('');
-  const [discountPercent, setDiscountPercent] = useState(0);
 
   const fetchAnalytics = async () => {
     try {
-      const response = await fetch('/api/reports/analytics', {
-        headers: { 'Authorization': localStorage.getItem('shakti-token') }
-      });
-      const data = await response.json();
+      const data = await api.getAnalytics();
       setAnalytics(data);
     } catch (error) { console.error('Analytics error:', error); }
   };
@@ -276,16 +117,15 @@ function App() {
   };
 
   const validateVoucher = async () => {
-    if (!promoCode) return;
+    if (!bookingForm.promoCode) return;
     try {
-      const res = await fetch(`/api/vouchers/validate?code=${promoCode}&serviceId=${selectedService?.id}`);
-      const data = await res.json();
+      const data = await api.validateVoucher(bookingForm.promoCode, bookingForm.service_id);
       if (data.success) {
-        setDiscountPercent(data.discount);
+        setBookingForm(prev => ({ ...prev, discount: data.discount }));
         notify('Voucher Aplicado!', `${data.discount}% de desconto aplicado.`);
       } else {
         notify('Inválido', data.message, 'error');
-        setDiscountPercent(0);
+        setBookingForm(prev => ({ ...prev, discount: 0 }));
       }
     } catch (err) {
       notify('Erro', 'Não foi possível validar o código.', 'error');
@@ -333,10 +173,7 @@ function App() {
 
   const fetchAppointments = async () => {
     try {
-      const response = await fetch('/api/bookings', {
-        headers: { 'Authorization': localStorage.getItem('shakti-token') }
-      });
-      const data = await response.json();
+      const data = await api.getAppointments();
       if (Array.isArray(data)) setAppointments(data);
     } catch (err) {
       console.error("Error fetching bookings:", err);
@@ -345,8 +182,7 @@ function App() {
 
   const fetchTechnicians = async () => {
     try {
-      const response = await fetch('/api/technicians');
-      const data = await response.json();
+      const data = await api.getTechnicians();
       if (Array.isArray(data)) setTechnicians(data);
     } catch (err) {
       console.error("Error fetching techs:", err);
@@ -412,17 +248,6 @@ function App() {
     } catch (e) { notify('Erro', 'Não foi possível apagar.', 'error'); }
   };
 
-  const fetchReports = async () => {
-    try {
-      const res = await fetch(`/api/reports/stats?start=${reportRange.start}&end=${reportRange.end}`);
-      const data = await res.json();
-      setReports(data);
-    } catch (e) { console.error("Reports err:", e); }
-  };
-
-  useEffect(() => {
-    if (adminTab === 'reports') fetchReports();
-  }, [adminTab, reportRange]);
 
   const fetchCustomers = async () => {
     try {
@@ -577,12 +402,7 @@ function App() {
     e.preventDefault();
     setIsSubmitting(true);
     try {
-      const res = await fetch('/api/login', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(loginForm)
-      });
-      const data = await res.json();
+      const data = await api.login(loginForm);
       if (data.success) {
         localStorage.setItem('shakti-token', data.token);
         localStorage.setItem('shakti-role', data.role);
@@ -611,14 +431,6 @@ function App() {
     setView('client');
   };
 
-  useEffect(() => {
-    if (bookingStep === 2 && formData.date) {
-      fetch(`/api/bookings/busy?date=${formData.date}`)
-        .then(res => res.json())
-        .then(data => setBusySlots(Array.isArray(data) ? data : []))
-        .catch(err => console.error("Error fetching slots:", err));
-    }
-  }, [formData.date, bookingStep]);
 
   useEffect(() => {
     const handleScroll = () => setScrolled(window.scrollY > 50);
@@ -627,57 +439,30 @@ function App() {
   }, []);
 
   const openBooking = (service = null) => {
-    setSelectedService(service);
-    setIsBookingOpen(true);
-    setBookingStep(1);
-  };
-
-  const nextStep = () => setBookingStep(prev => prev + 1);
-  const prevStep = () => setBookingStep(prev => prev - 1);
-
-  const handleInputChange = (e) => {
-    const { name, value } = e.target;
-    setFormData(prev => ({ ...prev, [name]: value }));
-  };
-
-  const handleGenerateAILook = async () => {
-    if (!videoRef.current || !resultsRef.current?.multiFaceLandmarks?.[0]) {
-      notify('Análise Facial', 'A IA está a calibrar os seus pontos faciais. Um momento...', 'info');
-      return;
+    if (service) {
+      setBookingForm(prev => ({ 
+        ...prev, 
+        service_id: service.id, 
+        service_name: service.name, 
+        price: service.price 
+      }));
+      setBookingStep(2);
+    } else {
+      setBookingStep(1);
     }
-    
-    setIsGeneratingLook(true);
-    
-    // Capture the current frame
-    const video = videoRef.current;
-    const tempCanvas = document.createElement('canvas');
-    tempCanvas.width = video.videoWidth;
-    tempCanvas.height = video.videoHeight;
-    const ctx = tempCanvas.getContext('2d');
-    ctx.scale(-1, 1);
-    ctx.drawImage(video, -tempCanvas.width, 0, tempCanvas.width, tempCanvas.height);
-    
-    setCapturedPhoto(tempCanvas.toDataURL('image/png'));
-    setCapturedLandmarks(resultsRef.current.multiFaceLandmarks[0]);
-
-    await new Promise(resolve => setTimeout(resolve, 2000));
-    
-    setIsGeneratingLook(false);
-    setMirrorStage('result');
-    notify('Look Gerado', 'O seu estilo foi aplicado à foto com sucesso!');
+    setIsBookingOpen(true);
   };
 
-  const handleBookingSubmit = async () => {
+  const handleBookingSubmit = async (e) => {
+    if (e && e.preventDefault) e.preventDefault();
     setIsSubmitting(true);
     try {
       const response = await fetch('/api/bookings', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          ...formData,
-          service: selectedService?.name,
-          technician: selectedService?.technician_id,
-          voucherCode: promoCode
+          ...bookingForm,
+          voucherCode: bookingForm.promoCode
         })
       });
       
@@ -686,14 +471,16 @@ function App() {
         notify('Reserva Efetuada', 'Receberá um contacto em breve para confirmação.');
         setIsBookingOpen(false);
         setBookingStep(1);
-        setFormData({ name: '', email: '', phone: '', date: calendarDate, time: '' });
-        setPromoCode('');
-        setDiscountPercent(0);
+        setBookingForm({
+          service_id: null, service_name: '', price: '',
+          date: new Date().toISOString().split('T')[0], time: '',
+          name: '', email: '', phone: '', promoCode: '', discount: 0
+        });
       } else {
         notify('Agendamento Negado', data.message || 'Horário indisponível.', 'error');
       }
     } catch (error) {
-      notify('Erro de Ligação', 'Não foi possível comunicar com o servidor.', 'error');
+      notify('Agendamento Negado', 'Erro técnico na reserva.', 'error');
     } finally {
       setIsSubmitting(false);
     }
@@ -743,799 +530,85 @@ function App() {
           </div>
         ) : (
           <>
-            <aside className="admin-sidebar glass-effect">
-              <div className="sidebar-logo">SHAKTI<span>HOME</span></div>
-              <nav className="side-nav">
-                <button className={`side-btn ${adminTab === 'table' ? 'active' : ''}`} onClick={() => setAdminTab('table')}>
-                  <LayoutDashboard size={20} /> <span>Marcações</span>
-                </button>
-                <button className={`side-btn ${adminTab === 'calendar' ? 'active' : ''}`} onClick={() => setAdminTab('calendar')}>
-                  <Calendar size={20} /> <span>Agenda</span>
-                </button>
-                {userRole === 'admin' && (
-                  <button className={`side-btn ${adminTab === 'technicians' ? 'active' : ''}`} onClick={() => setAdminTab('technicians')}>
-                    <Users size={20} /> <span>Técnicos</span>
-                  </button>
-                )}
-                {userRole === 'admin' && (
-                  <button className={`side-btn ${adminTab === 'services' ? 'active' : ''}`} onClick={() => setAdminTab('services')}>
-                    <Package size={20} /> <span>Serviços</span>
-                  </button>
-                )}
-                {userRole === 'admin' && (
-                  <button className={`side-btn ${adminTab === 'customers' ? 'active' : ''}`} onClick={() => setAdminTab('customers')}>
-                    <Users size={20} /> <span>Clientes</span>
-                  </button>
-                )}
-                {userRole === 'admin' && (
-                  <button className={`side-btn ${adminTab === 'reports' ? 'active' : ''}`} onClick={() => setAdminTab('reports')}>
-                    <BarChart2 size={20} /> <span>Relatórios</span>
-                  </button>
-                )}
-                {userRole === 'admin' && (
-                  <button className={`side-btn ${adminTab === 'settings' ? 'active' : ''}`} onClick={() => setAdminTab('settings')}>
-                    <Settings size={20} /> <span>Definições</span>
-                  </button>
-                )}
-              </nav>
-              <div className="sidebar-footer">
-                <button className="side-btn" onClick={fetchAppointments}>
-                  <RefreshCcw size={20} /> <span>Atualizar</span>
-                </button>
-                <button className="side-btn text-danger" onClick={handleLogout}>
-                  <LogOut size={20} /> <span>Sair</span>
-                </button>
-              </div>
-            </aside>
+            <Sidebar 
+              adminTab={adminTab} setAdminTab={setAdminTab} 
+              userRole={userRole} fetchAppointments={fetchAppointments} 
+              handleLogout={handleLogout} 
+            />
 
             <main className="admin-main">
-              <header className="admin-page-header">
-                <h1>{adminTab === 'table' ? 'Gestão de Reservas' : 
-                     adminTab === 'calendar' ? 'Calendário de Estúdio' : 
-                     adminTab === 'technicians' ? 'Gestão de Talentos' : 
-                     adminTab === 'customers' ? 'Histórico de Clientes' : 
-                     adminTab === 'reports' ? 'Performance de Negócio' : 'Configurações'}</h1>
-                <p className="subtitle">Bons tratamentos, {userRole === 'admin' ? 'Administrador' : technicians.find(t => t.id == userTechId)?.name || 'Técnico'}.</p>
-              </header>
+              <AdminHeader 
+                adminTab={adminTab} userRole={userRole} 
+                technicians={technicians} userTechId={userTechId} 
+              />
 
               <div className="admin-content-area">
                 {adminTab === 'table' && (
-                  <>
-                  <div className="admin-stats-grid">
-                    <div className="stat-card glass-effect">
-                      <div className="stat-icon" style={{ background: 'rgba(45, 90, 39, 0.1)', color: 'var(--primary)' }}><DollarSign size={20} /></div>
-                      <div className="stat-info">
-                        <small>Faturação Bruta</small>
-                        <h3>{analytics.revenue}€</h3>
-                      </div>
-                    </div>
-                    <div className="stat-card glass-effect">
-                      <div className="stat-icon" style={{ background: 'rgba(228, 197, 158, 0.2)', color: '#b68e5e' }}><Users size={20} /></div>
-                      <div className="stat-info">
-                        <small>Clientes Ativos</small>
-                        <h3>{analytics.customers?.active_customers || 0}</h3>
-                      </div>
-                    </div>
-                    <div className="stat-card glass-effect">
-                      <div className="stat-icon" style={{ background: 'rgba(52, 152, 219, 0.1)', color: '#3498db' }}><Calendar size={20} /></div>
-                      <div className="stat-info">
-                        <small>Agendamentos</small>
-                        <h3>{appointments.filter(a => a.status !== 'cancelled').length}</h3>
-                      </div>
-                    </div>
-                    <div className="stat-card glass-effect">
-                      <div className="stat-icon" style={{ background: 'rgba(155, 89, 182, 0.1)', color: '#9b59b6' }}><TrendingUp size={20} /></div>
-                      <div className="stat-info">
-                         <small>LTV Médio</small>
-                         <h3>{(analytics.revenue / (analytics.customers?.total_customers || 1)).toFixed(2)}€</h3>
-                      </div>
-                    </div>
-                  </div>
-
-                  {/* Standard Table (Desktop) */}
-                  <div className="admin-table-container glass-effect animate-in">
-                    <table className="admin-table">
-                      <thead>
-                        <tr>
-                          <th>Data/Hora</th>
-                          <th>Cliente</th>
-                          <th>Serviço/Técnico</th>
-                          <th>Status</th>
-                          <th>Ações</th>
-                        </tr>
-                      </thead>
-                      <tbody>
-                        {appointments.map(a => (
-                          <tr key={a.id}>
-                            <td>
-                              <div className="date-cell">
-                                <strong>{a.booking_date}</strong>
-                                <span>{a.booking_time}</span>
-                              </div>
-                            </td>
-                            <td>
-                              <div className="customer-cell">
-                                <strong>{a.customer_name}</strong>
-                                <div className="contact-small">
-                                  <small><Mail size={12}/> {a.customer_email}</small>
-                                </div>
-                              </div>
-                            </td>
-                            <td>
-                              <div className="service-cell">
-                                <strong>{a.service_name}</strong>
-                                <span className="tech-badge">{technicians.find(t => t.id == a.technician_id)?.name || 'Sem técnico'}</span>
-                              </div>
-                            </td>
-                            <td><span className={`status-badge ${a.status}`}>{a.status}</span></td>
-                            <td>
-                              <div className="admin-actions-cell">
-                                {a.status === 'pending' && <button className="action-btn confirm" title="Confirmar" onClick={() => updateBookingStatus(a.id, 'confirmed')}><CheckCircle2 size={18} /></button>}
-                                {a.status !== 'cancelled' && <button className="action-btn cancel" title="Cancelar" onClick={() => confirm('Deseja cancelar?') && updateBookingStatus(a.id, 'cancelled')}><X size={18} /></button>}
-                                {a.status === 'cancelled' && <button className="action-btn" title="Promover Vaga" style={{ background: 'var(--primary)', color: 'white' }} onClick={() => handlePromote(a.id)}><TrendingUp size={18} /></button>}
-                              </div>
-                            </td>
-                          </tr>
-                        ))}
-                      </tbody>
-                    </table>
-                  </div>
-
-                  {/* Mobile Cards (Phones) */}
-                  <div className="admin-mobile-cards animate-in">
-                    {appointments.map(a => (
-                      <div key={a.id} className="mobile-booking-card glass-effect">
-                        <div className="mobile-card-row">
-                          <span className="mobile-card-label">Cliente</span>
-                          <span className="mobile-card-value">{a.customer_name}</span>
-                        </div>
-                        <div className="mobile-card-row">
-                          <span className="mobile-card-label">Data / Hora</span>
-                          <span className="mobile-card-value">{a.booking_date} às {a.booking_time}</span>
-                        </div>
-                        <div className="mobile-card-row">
-                          <span className="mobile-card-label">Serviço</span>
-                          <span className="mobile-card-value">{a.service_name}</span>
-                        </div>
-                        <div className="mobile-card-row">
-                          <span className="mobile-card-label">Técnico</span>
-                          <span className="mobile-card-value">{technicians.find(t => t.id == a.technician_id)?.name || 'N/A'}</span>
-                        </div>
-                        <div className="mobile-card-row">
-                          <span className="mobile-card-label">Status</span>
-                          <span className={`status-badge ${a.status}`}>{a.status}</span>
-                        </div>
-                        {services.find(s => s.name === a.service_name)?.checklist ? (
-                          <div className="mobile-card-checklist mt-2" style={{ background: 'rgba(0,0,0,0.03)', padding: '10px', borderRadius: '10px' }}>
-                            <p style={{ fontSize: '0.7rem', fontWeight: 700, textTransform: 'uppercase', marginBottom: '5px', color: 'var(--text-muted)' }}>Checklist do Serviço</p>
-                            <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
-                              {JSON.parse(services.find(s => s.name === a.service_name).checklist).map((item, idx) => (
-                                <div key={idx} style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '0.8rem' }}>
-                                  <CheckSquare size={12} color="var(--primary)" /> {item}
-                                </div>
-                              ))}
-                            </div>
-                          </div>
-                        ) : null}
-                        <div className="mobile-card-actions">
-                          {a.status === 'pending' && (
-                             <button className="btn-primary w-full" onClick={() => updateBookingStatus(a.id, 'confirmed')}>Confirmar</button>
-                          )}
-                          {a.status !== 'cancelled' && (
-                             <button className="btn-secondary w-full" onClick={() => confirm('Cancelar?') && updateBookingStatus(a.id, 'cancelled')}>Cancelar</button>
-                          )}
-                          {a.status === 'cancelled' && (
-                             <button className="btn-secondary w-full" style={{ background: '#2d5a27', color: 'white' }} onClick={() => handlePromote(a.id)}>
-                               <TrendingUp size={16} /> Promover Vaga (Flash Deal)
-                             </button>
-                          )}
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-                  </>
+                  <AppointmentsTab 
+                    appointments={appointments} technicians={technicians} 
+                    services={services} analytics={analytics} 
+                    updateBookingStatus={updateBookingStatus} handlePromote={handlePromote} 
+                    notify={notify} 
+                  />
                 )}
 
                 {adminTab === 'calendar' && (
-                  <div className="calendar-panel-glass animate-in">
-                    <div className="calendar-header-compact">
-                      <div className="date-nav-mod">
-                        <button onClick={() => {
-                          const d = new Date(calendarDate); d.setDate(d.getDate() - 1); setCalendarDate(d.toISOString().split('T')[0]);
-                        }}><ChevronLeft/></button>
-                        <input type="date" value={calendarDate} onChange={e => setCalendarDate(e.target.value)} className="date-picker-clean" />
-                        <button onClick={() => {
-                          const d = new Date(calendarDate); d.setDate(d.getDate() + 1); setCalendarDate(d.toISOString().split('T')[0]);
-                        }}><ChevronRight/></button>
-                      </div>
-                    </div>
-
-                    {userRole === 'admin' && (
-                      <div className="tech-pills-container">
-                        {technicians.map(t => (
-                          <button key={t.id} className={`tech-pill ${selectedCalendarTechId == t.id ? 'active' : ''}`} onClick={() => setSelectedCalendarTechId(t.id)}>
-                            {t.name.split(' ')[0]}
-                          </button>
-                        ))}
-                      </div>
-                    )}
-
-                    <div className="calendar-viewport glass-effect">
-                      <div className="calendar-grid" style={{
-                        gridTemplateColumns: `80px repeat(${(!isMobile && userRole === 'admin') ? technicians.length : 1}, 1fr)`
-                      }}>
-                        <div className="grid-times">
-                          <div className="grid-header-cell">Hora</div>
-                          {timeSlots.map(t => <div key={t} className="time-slot-label">{t}</div>)}
-                        </div>
-                        {technicians
-                          .filter(t => (userRole === 'admin' ? (!isMobile || t.id == selectedCalendarTechId) : t.id == userTechId))
-                          .map(tech => (
-                            <div key={tech.id} className="grid-column">
-                              <div className="grid-header-cell">{tech.name}</div>
-                              {timeSlots.map(t => {
-                                const ap = appointments.find(a => a.booking_date === calendarDate && a.booking_time === t && a.technician_id == tech.id && a.status !== 'cancelled');
-                                const bl = blockouts.find(b => b.block_date === calendarDate && b.block_time === t && b.technician_id == tech.id);
-                                return (
-                                  <div key={t} className={`grid-slot ${ap ? 'occupied' : bl ? 'blocked' : 'empty'}`}
-                                       onClick={() => !ap && !bl && handleBlockSlot(tech.id, calendarDate, t)}>
-                                    {ap ? (
-                                      <div className={`ap-card ${ap.status}`}>
-                                        <strong>{ap.service_name}</strong>
-                                        <span>{ap.customer_name}</span>
-                                        {services.find(s => s.name === ap.service_name)?.checklist && (
-                                          <div className="ap-card-checklist" style={{ marginTop: '4px', paddingTop: '4px', borderTop: '1px solid rgba(255,255,255,0.1)', fontSize: '0.65rem' }}>
-                                            {JSON.parse(services.find(s => s.name === ap.service_name).checklist).slice(0, 2).map((item, i) => (
-                                              <div key={i} style={{ display: 'flex', alignItems: 'center', gap: '2px' }}>
-                                                <CheckSquare size={8} /> {item}
-                                              </div>
-                                            ))}
-                                            {JSON.parse(services.find(s => s.name === ap.service_name).checklist).length > 2 && <div>+{JSON.parse(services.find(s => s.name === ap.service_name).checklist).length - 2} mais...</div>}
-                                          </div>
-                                        )}
-                                      </div>
-                                    ) : bl ? <div className="bl-card"><span>INDISPONÍVEL</span></div> : (
-                                      <div className="slot-add">
-                                        <span onClick={() => handleBlockSlot(tech.id, calendarDate, t)}>+</span>
-                                        {userRole === 'admin' && (
-                                          <button className="promo-inline-btn" title="Promover este horário" onClick={(e) => { e.stopPropagation(); handlePromoteEmpty(calendarDate, t); }}>
-                                            <Zap size={14} />
-                                          </button>
-                                        )}
-                                      </div>
-                                    )}
-                                  </div>
-                                );
-                              })}
-                            </div>
-                          ))}
-                      </div>
-                    </div>
-                  </div>
-                )}
-
-                {adminTab === 'services' && (
-                  <div className="services-mgmt-layout animate-in">
-                    <div className="admin-page-header">
-                      <h1>Gestão de Serviços</h1>
-                      <div className="header-actions">
-                        <div className="search-box-v3">
-                          <input 
-                            type="text" 
-                            placeholder="Pesquisar serviço..." 
-                            className="glass-input"
-                            value={serviceSearch}
-                            onChange={(e) => setServiceSearch(e.target.value)}
-                          />
-                        </div>
-                        <label className="checkbox-toggle">
-                          <input type="checkbox" checked={showDeletedServices} onChange={(e) => setShowDeletedServices(e.target.checked)} />
-                          <span>Ver Apagados</span>
-                        </label>
-                      </div>
-                    </div>
-
-                    <div className="bento-grid">
-                      {/* Create New Service Card */}
-                      <div className="bento-card glass-effect create-service-form">
-                        <h3>Novo Serviço</h3>
-                        <form onSubmit={(e) => {
-                          e.preventDefault();
-                          const f = e.target;
-                          createService({ name: f.nm.value, duration: f.du.value, price: f.pr.value, category: f.cat.value, technician_id: parseInt(f.tid.value) });
-                          f.reset();
-                        }}>
-                          <input name="nm" placeholder="Nome do Serviço" className="glass-input" required />
-                          <div className="grid-split mt-2">
-                             <input name="du" placeholder="Duração (ex: 60 min)" className="glass-input" required />
-                             <input name="pr" placeholder="Preço (ex: 45€)" className="glass-input" required />
-                          </div>
-                          <select name="cat" className="glass-input mt-2">
-                             <option>Massagens</option><option>Cabeleireiro</option><option>Unhas</option><option>Terapias</option>
-                          </select>
-                          <select name="tid" className="glass-input mt-2">
-                             {technicians.map(t => <option key={t.id} value={t.id}>{t.name}</option>)}
-                          </select>
-                          <button className="btn-primary w-full mt-4">Adicionar Serviço</button>
-                        </form>
-                      </div>
-
-                      {services.map(s => {
-                        const list = s.checklist ? (typeof s.checklist === 'string' ? JSON.parse(s.checklist) : s.checklist) : [];
-                        const isDeleted = s.deleted_at !== null;
-                        return (
-                          <div key={s.id} className={`bento-card glass-effect ${isDeleted ? 'deleted-card' : ''}`}>
-                             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                               <h3 style={{ margin: 0, color: isDeleted ? '#666' : 'var(--primary)', fontWeight: 700 }}>{s.name}</h3>
-                               <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-                                 <label className="checkbox-toggle" style={{ fontSize: '0.65rem', padding: '2px 8px' }}>
-                                   <input type="checkbox" checked={s.vouchers_enabled} onChange={async (e) => {
-                                      const res = await fetch(`/api/services/${s.id}`, {
-                                        method: 'PATCH',
-                                        headers: { 'Content-Type': 'application/json', 'Authorization': 'fake-jwt-shakti-admin' },
-                                        body: JSON.stringify({ vouchers_enabled: e.target.checked })
-                                      });
-                                      if ((await res.json()).success) { notify('Atualizado', 'Vouchers ' + (e.target.checked ? 'Ativos' : 'Desativados')); fetchServicesFromDB(); }
-                                   }} />
-                                   <span>Vouchers</span>
-                                 </label>
-                                 <span style={{ fontSize: '0.7rem', padding: '2px 8px', borderRadius: '10px', background: isDeleted ? '#eee' : 'var(--primary-light)', color: isDeleted ? '#666' : 'var(--primary)' }}>{s.category}</span>
-                               </div>
-                            </div>
-                            
-                            {!isDeleted ? (
-                              <>
-                              <div className="mt-4">
-                                <p style={{ fontSize: '0.8rem', fontWeight: 600, marginBottom: '0.5rem' }}>Configurações Flash Deal:</p>
-                                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px', marginBottom: '15px' }}>
-                                  <div className="form-group" style={{ margin: 0 }}>
-                                    <label style={{ fontSize: '0.7rem' }}>Desconto (%)</label>
-                                    <input type="number" defaultValue={s.promo_discount || 10} className="glass-input" style={{ padding: '5px' }} onBlur={async (e) => {
-                                      const res = await fetch(`/api/services/${s.id}`, {
-                                        method: 'PATCH',
-                                        headers: { 'Content-Type': 'application/json', 'Authorization': 'fake-jwt-shakti-admin' },
-                                        body: JSON.stringify({ promo_discount: parseInt(e.target.value) })
-                                      });
-                                      if ((await res.json()).success) { notify('Atualizado', 'Desconto promo guardado.'); fetchServicesFromDB(); }
-                                    }} />
-                                  </div>
-                                  <div className="form-group" style={{ margin: 0 }}>
-                                    <label style={{ fontSize: '0.7rem' }}>Validade (min)</label>
-                                    <input type="number" defaultValue={s.promo_validity || 60} className="glass-input" style={{ padding: '5px' }} onBlur={async (e) => {
-                                      const res = await fetch(`/api/services/${s.id}`, {
-                                        method: 'PATCH',
-                                        headers: { 'Content-Type': 'application/json', 'Authorization': 'fake-jwt-shakti-admin' },
-                                        body: JSON.stringify({ promo_validity: parseInt(e.target.value) })
-                                      });
-                                      if ((await res.json()).success) { notify('Atualizado', 'Validade promo guardada.'); fetchServicesFromDB(); }
-                                    }} />
-                                  </div>
-                                </div>
-                                <p style={{ fontSize: '0.8rem', fontWeight: 600, marginBottom: '0.5rem' }}>Checklist de Preparação:</p>
-                                <div style={{ display: 'flex', flexDirection: 'column', gap: '0.4rem' }}>
-                                  {list.map((item, idx) => (
-                                    <div key={idx} style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', background: 'rgba(0,0,0,0.03)', padding: '5px 10px', borderRadius: '5px' }}>
-                                      <CheckSquare size={14} color="var(--primary)" />
-                                      <span style={{ fontSize: '0.85rem', flex: 1 }}>{item}</span>
-                                      <X size={14} style={{ cursor: 'pointer', opacity: 0.5 }} onClick={async () => {
-                                        const newList = list.filter((_, i) => i !== idx);
-                                        const res = await fetch(`/api/services/${s.id}`, {
-                                          method: 'PATCH',
-                                          headers: { 'Content-Type': 'application/json', 'Authorization': 'fake-jwt-shakti-admin' },
-                                          body: JSON.stringify({ checklist: newList })
-                                        });
-                                        if ((await res.json()).success) { notify('Removido', 'Item removido.'); fetchServicesFromDB(); }
-                                      }} />
-                                    </div>
-                                  ))}
-                                  <button className="btn-secondary" style={{ padding: '8px', fontSize: '0.8rem', borderStyle: 'dashed', background: 'transparent' }} onClick={async () => {
-                                    const newItem = prompt("Adicionar passo:");
-                                    if (newItem) {
-                                      const newList = [...list, newItem];
-                                      const res = await fetch(`/api/services/${s.id}`, {
-                                        method: 'PATCH',
-                                        headers: { 'Content-Type': 'application/json', 'Authorization': 'fake-jwt-shakti-admin' },
-                                        body: JSON.stringify({ checklist: newList })
-                                      });
-                                      if ((await res.json()).success) { notify('Atualizado', 'Passo adicionado.'); fetchServicesFromDB(); }
-                                    }
-                                  }}>+ Adicionar Passo</button>
-                                </div>
-                              </div>
-
-                              <div className="mt-4 pt-4 border-t border-gray-100">
-                                <p style={{ fontSize: '0.8rem', fontWeight: 600, marginBottom: '0.5rem' }}>🎫 Vouchers Associados:</p>
-                                <div style={{ display: 'flex', flexDirection: 'column', gap: '0.3rem' }}>
-                                  {vouchers.filter(v => v.service_id === s.id).map(v => (
-                                    <div key={v.id} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', background: 'rgba(0,0,0,0.02)', padding: '4px 10px', borderRadius: '5px', fontSize: '0.75rem' }}>
-                                      <span style={{ fontWeight: 700, color: v.is_used ? '#999' : 'var(--primary)' }}>{v.code}</span>
-                                      <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                                        <span style={{ opacity: 0.6 }}>{v.discount_percent}%</span>
-                                        <span style={{ opacity: 0.8, color: '#666' }}>({v.current_uses}/{v.max_uses})</span>
-                                        <span style={{ padding: '2px 5px', borderRadius: '4px', fontSize: '10px', background: v.is_used ? '#eee' : '#e6fffa', color: v.is_used ? '#999' : '#2d5a27' }}>
-                                          {v.is_used ? 'ESGOTADO' : 'ATIVO'}
-                                        </span>
-                                        <X size={12} style={{ cursor: 'pointer', opacity: 0.4 }} onClick={() => deleteVoucher(v.id)} />
-                                      </div>
-                                    </div>
-                                  ))}
-                                  <button className="btn-secondary" style={{ padding: '6px', fontSize: '0.75rem', borderStyle: 'dotted' }} onClick={() => {
-                                    const code = prompt("Código do Voucher (ex: PROMO-AYURVIP):")?.toUpperCase();
-                                    const disc = prompt("Desconto (%):", "15");
-                                    const uses = prompt("Número total de utilizações (ex: 10):", "1");
-                                    if (code && disc && uses) {
-                                      const fut = new Date(); fut.setMonth(fut.getMonth() + 1);
-                                      createManualVoucher({ code, discount: parseInt(disc), service_id: s.id, expires_at: fut.toISOString().slice(0, 19).replace('T', ' '), max_uses: parseInt(uses) });
-                                    }
-                                  }}>+ Criar Voucher Manual</button>
-                                </div>
-                              </div>
-
-                              <button className="btn-secondary w-full mt-4" style={{ color: '#ef4444' }} onClick={() => softDeleteService(s.id)}>Eliminar Serviço</button>
-                              </>
-                            ) : (
-                              <div className="deleted-actions mt-4">
-                                <p style={{ fontSize: '0.8rem', fontStyle: 'italic', color: '#999' }}>Serviço removido em {new Date(s.deleted_at).toLocaleDateString()}</p>
-                                <div style={{ display: 'flex', gap: '10px', marginTop: '10px' }}>
-                                  <button className="btn-primary w-full" onClick={() => restoreService(s.id)}>Restaurar</button>
-                                  <button className="btn-secondary w-full" style={{ color: '#ef4444' }} onClick={() => hardDeleteService(s.id)}>Apagar Permanente</button>
-                                </div>
-                              </div>
-                            )}
-                          </div>
-                        );
-                      })}
-                    </div>
-                  </div>
+                  <CalendarTab 
+                    calendarDate={calendarDate} setCalendarDate={setCalendarDate} 
+                    userRole={userRole} technicians={technicians} 
+                    selectedCalendarTechId={selectedCalendarTechId} 
+                    setSelectedCalendarTechId={setSelectedCalendarTechId} 
+                    appointments={appointments} timeSlots={timeSlots} 
+                    blockouts={blockouts} handleBlockSlot={handleBlockSlot} 
+                    handlePromoteEmpty={handlePromoteEmpty} 
+                  />
                 )}
 
                 {adminTab === 'technicians' && (
-                  <div className="technicians-layout-v3 animate-in">
-                    <div className="bento-grid-tech">
-                      <div className="glass-card p-6">
-                        <h3>Adicionar Talento</h3>
-                        <form className="modern-form mt-4" onSubmit={async (e) => {
-                          e.preventDefault();
-                          const f = e.target;
-                          const res = await fetch('/api/technicians', {
-                            method: 'POST',
-                            headers: { 'Content-Type': 'application/json', 'Authorization': localStorage.getItem('shakti-token') },
-                            body: JSON.stringify({ name: f.nm.value, username: f.un.value, password: f.pw.value, specialty: f.sp.value })
-                          });
-                          if ((await res.json()).success) { alert('Criado!'); f.reset(); fetchTechnicians(); }
-                        }}>
-                          <input name="nm" placeholder="Nome Completo" className="glass-input" required />
-                          <input name="un" placeholder="Login" className="glass-input mt-2" required />
-                          <input name="pw" type="password" placeholder="Password" className="glass-input mt-2" required />
-                          <select name="sp" className="glass-input mt-2">
-                            <option>Massagens</option><option>Cabeleireiro</option><option>Unhas</option><option>Terapias</option>
-                          </select>
-                          <button className="btn-primary w-full mt-4">Registar Técnico</button>
-                        </form>
-                      </div>
-                      <div className="tech-list-box-mod">
-                        {technicians.map(t => (
-                          <div key={t.id} className="tech-card-premium glass-effect">
-                            <div className="avatar-small">{t.name[0]}</div>
-                            <div className="tech-info-v3">
-                              <h4>{t.name}</h4>
-                              <p>{t.specialty}</p>
-                              <div className="hr-rate-edit">
-                                <label>€/h:</label>
-                                <input type="number" defaultValue={t.hourly_rate} onBlur={e => updateHourlyRate(t.id, e.target.value)} />
-                              </div>
-                            </div>
-                            <div className="tech-stat-v3">
-                              <small>Estimativa Pago</small>
-                              <strong>{appointments.filter(a => a.technician_id == t.id && a.status === 'confirmed').reduce((acc, curr) => {
-                                const s = services.find(serv => serv.name === curr.service_name);
-                                const h = s ? (parseFloat(s.duration) / 60) : 1;
-                                return acc + (h * (t.hourly_rate || 0));
-                              }, 0).toFixed(2)}€</strong>
-                            </div>
-                          </div>
-                        ))}
-                      </div>
-                    </div>
-                  </div>
+                  <TechniciansTab 
+                    technicians={technicians} appointments={appointments} 
+                    services={services} updateHourlyRate={updateHourlyRate} 
+                    fetchTechnicians={fetchTechnicians} 
+                  />
+                )}
+
+                {adminTab === 'services' && (
+                  <ServicesTab 
+                    services={services} technicians={technicians} 
+                    serviceSearch={serviceSearch} setServiceSearch={setServiceSearch} 
+                    showDeletedServices={showDeletedServices} 
+                    setShowDeletedServices={setShowDeletedServices} 
+                    createService={createService} softDeleteService={softDeleteService} 
+                    restoreService={restoreService} hardDeleteService={hardDeleteService} 
+                    vouchers={vouchers} deleteVoucher={deleteVoucher} 
+                    createManualVoucher={createManualVoucher} notify={notify} 
+                    fetchServicesFromDB={fetchServicesFromDB} 
+                  />
                 )}
 
                 {adminTab === 'customers' && (
-                  <div className="customers-layout animate-in">
-                    <div className="admin-page-header">
-                      <h1>Gestão de Clientes (CRM)</h1>
-                      <div className="header-actions">
-                        <div className="search-box-v3">
-                          <input 
-                            type="text" 
-                            placeholder="Pesquisar por nome ou email..." 
-                            className="glass-input"
-                            value={customerSearch}
-                            onChange={(e) => setCustomerSearch(e.target.value)}
-                          />
-                        </div>
-                      </div>
-                    </div>
-
-                    <div className="bento-grid">
-                      {customers.map(c => (
-                        <div key={c.id} className="bento-card glass-effect customer-card" style={{ cursor: 'pointer', transition: 'transform 0.3s' }} onClick={() => setSelectedCustomer(c)}>
-                          <div className="customer-header" style={{ display: 'flex', gap: '15px', alignItems: 'center' }}>
-                            <div className="avatar-med" style={{ width: '45px', height: '45px', borderRadius: '50%', background: 'var(--primary)', color: 'white', display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 800 }}>{c.name[0]}</div>
-                            <div>
-                               <h3 style={{ margin: 0, fontSize: '1rem' }}>{c.name}</h3>
-                               <p style={{ margin: 0, opacity: 0.6, fontSize: '0.8rem' }}>{c.email}</p>
-                            </div>
-                          </div>
-                          <div className="customer-mini-stats mt-4" style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.75rem', opacity: 0.8 }}>
-                             <div><strong>{c.total_bookings}</strong> visitas</div>
-                             <div><strong>{c.total_spent || 0}€</strong> total</div>
-                             <div>Última: {c.last_visit ? new Date(c.last_visit).toLocaleDateString() : 'N/A'}</div>
-                          </div>
-                        </div>
-                      ))}
-                    </div>
-
-                    {/* Customer Profile Modal */}
-                    {selectedCustomer && (
-                      <div className="modal-overlay">
-                        <div className="modal-content profile-modal animate" style={{ maxWidth: '900px', padding: '0', background: 'white', borderRadius: '30px', overflow: 'hidden' }}>
-                          <div className="profile-header" style={{ background: 'var(--primary)', color: 'white', padding: '40px', position: 'relative' }}>
-                            <div style={{ display: 'flex', gap: '30px', alignItems: 'center' }}>
-                              <div className="avatar-large" style={{ width: '100px', height: '100px', borderRadius: '50%', background: 'white', color: 'var(--primary)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '2.5rem', fontWeight: 900 }}>{selectedCustomer.name[0]}</div>
-                              <div className="profile-main-info">
-                                 <h2 style={{ margin: 0, fontSize: '2rem' }}>{selectedCustomer.name}</h2>
-                                 <p style={{ margin: '5px 0', opacity: 0.8 }}>{selectedCustomer.email} • {selectedCustomer.phone}</p>
-                                 <div className="chips-row" style={{ display: 'flex', gap: '10px', marginTop: '15px' }}>
-                                   <span className="chip" style={{ background: 'rgba(255,255,255,0.2)', padding: '5px 12px', borderRadius: '20px', fontSize: '0.75rem' }}>Cliente desde {new Date(selectedCustomer.created_at).toLocaleDateString()}</span>
-                                   <span className="chip highlight" style={{ background: 'white', color: 'var(--primary)', padding: '5px 12px', borderRadius: '20px', fontSize: '0.75rem', fontWeight: 700 }}>VERIFICADO</span>
-                                 </div>
-                              </div>
-                            </div>
-                            <X className="close-profile" style={{ position: 'absolute', top: '25px', right: '25px', cursor: 'pointer', opacity: 0.7 }} onClick={() => setSelectedCustomer(null)} />
-                          </div>
-
-                          <div className="profile-body" style={{ display: 'grid', gridTemplateColumns: '1fr 2fr' }}>
-                            <div className="profile-sidebar" style={{ padding: '30px', borderRight: '1px solid #eee' }}>
-                              <div className="sidebar-group">
-                                <label style={{ fontSize: '0.75rem', fontWeight: 700, display: 'block', marginBottom: '8px' }}>Data de Aniversário</label>
-                                <input 
-                                  type="date" 
-                                  className="glass-input" 
-                                  defaultValue={selectedCustomer.birthday ? selectedCustomer.birthday.slice(0, 10) : ''}
-                                  onBlur={(e) => updateCustomer(selectedCustomer.id, { birthday: e.target.value })}
-                                />
-                                <p style={{ fontSize: '0.65rem', margin: '5px 0', opacity: 0.6 }}>Ideal para campanhas de bday.</p>
-                              </div>
-                              
-                              <div className="sidebar-group mt-10">
-                                <h3 style={{ fontSize: '0.9rem', marginBottom: '15px' }}>Histórico de Tratamentos</h3>
-                                <div className="mini-timeline" style={{ borderLeft: '2px solid #eee', paddingLeft: '20px', marginLeft: '5px' }}>
-                                  {appointments.filter(a => a.customer_email === selectedCustomer.email).slice(0, 5).map(a => (
-                                    <div key={a.id} className="timeline-item" style={{ position: 'relative', paddingBottom: '20px' }}>
-                                      <div className="dot" style={{ position: 'absolute', left: '-27px', top: '5px', width: '12px', height: '12px', borderRadius: '50%', background: a.status === 'confirmed' ? 'var(--primary)' : '#ccc' }}></div>
-                                      <div className="tl-content">
-                                        <strong style={{ display: 'block', fontSize: '0.85rem' }}>{a.service_name}</strong>
-                                        <p style={{ fontSize: '0.7rem', margin: '2px 0', opacity: 0.6 }}>{new Date(a.booking_date).toLocaleDateString()} • {a.status}</p>
-                                      </div>
-                                    </div>
-                                  ))}
-                                  {appointments.filter(a => a.customer_email === selectedCustomer.email).length === 0 && <p style={{ fontSize: '0.7rem', opacity: 0.5 }}>Sem histórico registado.</p>}
-                                </div>
-                              </div>
-                            </div>
-
-                            <div className="profile-main-content" style={{ padding: '40px' }}>
-                               <div className="anamnesis-section">
-                                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '25px' }}>
-                                    <h3 style={{ margin: 0, fontSize: '1.2rem' }}>Anamnese Detalhada (Saúde)</h3>
-                                    <span style={{ fontSize: '0.65rem', color: 'var(--primary)', fontWeight: 800, letterSpacing: '1px' }}>CONFIDENCIAL • RGPD</span>
-                                 </div>
-                                 
-                                 {(() => {
-                                   let ana = { clinico: '', alergias: '', medicamentos: '', zonas: '', estilo: '', stress: 5 };
-                                   try {
-                                     ana = selectedCustomer.anamnesis ? (typeof selectedCustomer.anamnesis === 'string' ? JSON.parse(selectedCustomer.anamnesis) : selectedCustomer.anamnesis) : ana;
-                                   } catch(e) { console.error(e); }
-                                   
-                                   return (
-                                     <div className="anamnesis-grid" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '30px' }}>
-                                       <div className="ana-field">
-                                         <label style={{ display: 'block', fontWeight: 700, fontSize: '0.8rem', marginBottom: '8px' }}>☢️ Histórico Clínico / Cirurgias</label>
-                                         <textarea 
-                                          style={{ width: '100%', height: '80px', padding: '12px', borderRadius: '15px', border: '1px solid #ddd', fontSize: '0.8rem', resize: 'none' }}
-                                          defaultValue={ana.clinico} 
-                                          onBlur={(e) => {
-                                            const newAna = { ...ana, clinico: e.target.value };
-                                            updateCustomer(selectedCustomer.id, { anamnesis: newAna });
-                                          }} 
-                                          placeholder="Ex: Prótese anca, Diabetes..." 
-                                         />
-                                       </div>
-                                       <div className="ana-field">
-                                         <label style={{ display: 'block', fontWeight: 700, fontSize: '0.8rem', marginBottom: '8px' }}>⚠️ Alergias e Hipersensibilidade</label>
-                                         <textarea 
-                                          style={{ width: '100%', height: '80px', padding: '12px', borderRadius: '15px', border: '1px solid #ddd', fontSize: '0.8rem', resize: 'none' }}
-                                          defaultValue={ana.alergias} 
-                                          onBlur={(e) => {
-                                            const newAna = { ...ana, alergias: e.target.value };
-                                            updateCustomer(selectedCustomer.id, { anamnesis: newAna });
-                                          }} 
-                                          placeholder="Ex: Alergia a Frutos Secos (Óleo amêndoa)..." 
-                                         />
-                                       </div>
-                                       <div className="ana-field">
-                                         <label style={{ display: 'block', fontWeight: 700, fontSize: '0.8rem', marginBottom: '8px' }}>🧘 Estilo de Vida e Hábitos</label>
-                                         <textarea 
-                                          style={{ width: '100%', height: '80px', padding: '12px', borderRadius: '15px', border: '1px solid #ddd', fontSize: '0.8rem', resize: 'none' }}
-                                          defaultValue={ana.estilo} 
-                                          onBlur={(e) => {
-                                            const newAna = { ...ana, estilo: e.target.value };
-                                            updateCustomer(selectedCustomer.id, { anamnesis: newAna });
-                                          }} 
-                                          placeholder="Ex: Pratica desporto 3x/semana, dieta vegetariana..." 
-                                         />
-                                       </div>
-                                       <div className="ana-field">
-                                         <label style={{ display: 'block', fontWeight: 700, fontSize: '0.8rem', marginBottom: '8px' }}>⚡ Nível de Stress (1-10)</label>
-                                         <div style={{ display: 'flex', gap: '15px', alignItems: 'center', background: '#f9f9f9', padding: '15px', borderRadius: '15px' }}>
-                                           <input 
-                                              type="range" min="1" max="10" 
-                                              defaultValue={ana.stress || 5} 
-                                              onChange={(e) => {
-                                                const newAna = { ...ana, stress: e.target.value };
-                                                updateCustomer(selectedCustomer.id, { anamnesis: newAna });
-                                              }} 
-                                              style={{ flex: 1, accentColor: 'var(--primary)' }}
-                                           />
-                                           <span style={{ fontWeight: 800, fontSize: '1.2rem', color: 'var(--primary)' }}>{ana.stress || 5}</span>
-                                         </div>
-                                       </div>
-                                       <div className="ana-field" style={{ gridColumn: 'span 2' }}>
-                                         <label style={{ display: 'block', fontWeight: 700, fontSize: '0.8rem', marginBottom: '8px' }}>📍 Zonas de Cuidado / Notas Extra</label>
-                                         <textarea 
-                                          style={{ width: '100%', height: '60px', padding: '12px', borderRadius: '15px', border: '1px solid #ddd', fontSize: '0.8rem', resize: 'none' }}
-                                          defaultValue={ana.zonas} 
-                                          onBlur={(e) => {
-                                            const newAna = { ...ana, zonas: e.target.value };
-                                            updateCustomer(selectedCustomer.id, { anamnesis: newAna });
-                                          }} 
-                                          placeholder="Ex: Muita sensibilidade nos pés, Dor lombar L4..." 
-                                         />
-                                       </div>
-                                     </div>
-                                   );
-                                 })()}
-                               </div>
-                            </div>
-                          </div>
-                        </div>
-                      </div>
-                    )}
-                  </div>
+                  <CustomersTab 
+                    customers={customers} customerSearch={customerSearch} 
+                    setCustomerSearch={setCustomerSearch} appointments={appointments} 
+                    updateCustomer={updateCustomer} 
+                  />
                 )}
 
                 {adminTab === 'reports' && (
-                  <div className="admin-reports-view animate-in">
-                    <div className="admin-page-header">
-                      <h1>Analytics & Business Intelligence</h1>
-                      <p>Dados globais de crescimento e performance da Shakti Home.</p>
-                    </div>
-
-                    <div className="reports-grid" style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(400px, 1fr))', gap: '30px', marginTop: '30px' }}>
-                      
-                      {/* Trend Chart (SVG) */}
-                      <div className="bento-card glass-effect chart-card">
-                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '25px' }}>
-                           <h3>Tendência de Agendamentos (7 dias)</h3>
-                           <RefreshCcw size={16} style={{ cursor: 'pointer', opacity: 0.5 }} onClick={fetchAnalytics} />
-                        </div>
-                        <div className="svg-chart-container" style={{ height: '200px', width: '100%', position: 'relative' }}>
-                          <svg viewBox="0 0 700 200" style={{ width: '100%', height: '100%', overflow: 'visible' }}>
-                            {analytics.trends.length > 1 && (
-                              <>
-                                <defs>
-                                  <linearGradient id="areaGradient" x1="0" y1="0" x2="0" y2="1">
-                                    <stop offset="0%" stopColor="var(--primary)" stopOpacity="0.3"/>
-                                    <stop offset="100%" stopColor="var(--primary)" stopOpacity="0"/>
-                                  </linearGradient>
-                                </defs>
-                                <path 
-                                  d={`M ${analytics.trends.map((t, i) => `${(i * 100)},${180 - (t.count * 20)}`).join(' L ')} L ${(analytics.trends.length-1)*100},200 L 0,200 Z`}
-                                  fill="url(#areaGradient)"
-                                />
-                                <path 
-                                  d={`M ${analytics.trends.map((t, i) => `${(i * 100)},${180 - (t.count * 20)}`).join(' L ')}`}
-                                  fill="none" 
-                                  stroke="var(--primary)" 
-                                  strokeWidth="3"
-                                  strokeLinecap="round"
-                                  strokeLinejoin="round"
-                                />
-                                {analytics.trends.map((t, i) => (
-                                  <g key={i}>
-                                    <circle cx={i * 100} cy={180 - (t.count * 20)} r="4" fill="white" stroke="var(--primary)" strokeWidth="2" />
-                                    <text x={i * 100} y="195" fontSize="10" textAnchor="middle" fill="#999">{t.date.split('-').slice(1).join('/')}</text>
-                                    <text x={i * 100} y={170 - (t.count * 20)} fontSize="10" textAnchor="middle" fill="var(--primary)" fontWeight="700">{t.count}</text>
-                                  </g>
-                                ))}
-                              </>
-                            )}
-                            {analytics.trends.length <= 1 && <text x="350" y="100" textAnchor="middle" fill="#999">Dados insuficientes para gerar gráfico histórico.</text>}
-                          </svg>
-                        </div>
-                      </div>
-
-                      {/* Service Pie-like Chart (Horizontal Bars) */}
-                      <div className="bento-card glass-effect chart-card">
-                        <h3>Tratamentos Mais Solicitados</h3>
-                        <div className="horizontal-bar-list mt-6" style={{ display: 'flex', flexDirection: 'column', gap: '15px' }}>
-                          {analytics.services.slice(0, 5).map((s, i) => {
-                            const max = analytics.services[0]?.count || 1;
-                            const perc = (s.count / max) * 100;
-                            return (
-                              <div key={i} className="bar-row">
-                                <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.85rem', marginBottom: '5px' }}>
-                                  <span>{s.service_name}</span>
-                                  <strong>{s.count} packs</strong>
-                                </div>
-                                <div style={{ height: '8px', background: 'rgba(0,0,0,0.05)', borderRadius: '4px', overflow: 'hidden' }}>
-                                  <div style={{ height: '100%', width: `${perc}%`, background: `linear-gradient(90deg, var(--primary), var(--primary-light))`, borderRadius: '4px', transition: 'width 1s ease-out' }}></div>
-                                </div>
-                              </div>
-                            );
-                          })}
-                        </div>
-                      </div>
-
-                      {/* Technician Revenue Comparison */}
-                      <div className="bento-card glass-effect chart-card" style={{ gridColumn: 'span 2' }}>
-                        <h3>Performance por Especialista (Faturação)</h3>
-                        <div className="tech-perf-grid mt-6" style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '20px' }}>
-                           {analytics.technicians.map((t, idx) => (
-                             <div key={idx} className="tech-stat-box" style={{ padding: '20px', background: 'rgba(255,255,255,0.5)', borderRadius: '20px', border: '1px solid rgba(0,0,0,0.03)' }}>
-                               <h4 style={{ margin: 0, fontSize: '0.9rem', color: '#666' }}>{t.name}</h4>
-                               <div style={{ display: 'flex', alignItems: 'baseline', gap: '5px', marginTop: '10px' }}>
-                                 <h2 style={{ margin: 0, color: 'var(--primary)', fontSize: '1.8rem' }}>{parseFloat(t.revenue || 0).toFixed(0)}€</h2>
-                                 <small style={{ opacity: 0.6 }}>total</small>
-                               </div>
-                               <p style={{ margin: '10px 0 0 0', fontSize: '0.75rem', fontWeight: 600 }}>{t.count} serviços realizados</p>
-                             </div>
-                           ))}
-                        </div>
-                      </div>
-
-                    </div>
-                  </div>
+                  <ReportsTab 
+                    analytics={analytics} fetchAnalytics={fetchAnalytics} 
+                  />
                 )}
 
                 {adminTab === 'settings' && (
-                  <div className="settings-layout-v3 animate-in">
-                    <div className="glass-card p-8 max-w-2xl">
-                      <h3>Configurações Globais</h3>
-                      <form className="mt-6" onSubmit={e => {
-                        e.preventDefault();
-                        updateSettings({ calendar_start: e.target.s.value, calendar_end: e.target.e.value, slot_duration: e.target.d.value });
-                      }}>
-                        <div className="sett-grid">
-                          <div className="form-group">
-                            <label>Hora Abertura</label>
-                            <input name="s" type="time" defaultValue={settings.calendar_start} className="glass-input" />
-                          </div>
-                          <div className="form-group">
-                            <label>Hora Encerramento</label>
-                            <input name="e" type="time" defaultValue={settings.calendar_end} className="glass-input" />
-                          </div>
-                          <div className="form-group">
-                            <label>Duração Bloco (min)</label>
-                            <select name="d" defaultValue={settings.slot_duration} className="glass-input">
-                              <option value="30">30</option><option value="60">60</option><option value="90">90</option>
-                            </select>
-                          </div>
-                        </div>
-                        <button className="btn-primary mt-8">Guardar Todas as Configurações</button>
-                      </form>
-                    </div>
+                  <SettingsTab 
+                    settings={settings} updateSettings={updateSettings} 
+                  />
+                )}
+
+                {adminTab === 'mirror' && (
+                  <div className="admin-mirror-container animate-in" style={{ height: '75vh', maxHeight: '800px', background: 'white', borderRadius: '20px', overflow: 'hidden' }}>
+                    <MirrorStudio variant="admin" onBooking={openBooking} />
                   </div>
                 )}
               </div>
@@ -1545,513 +618,47 @@ function App() {
       </div>
     ) : (
       <div className="app">
-      {isMirrorOpen && (
-        <div className="mirror-overlay">
-          <div className="mirror-content animate">
-            <div className="mirror-header" style={{ padding: '20px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-               <h3 style={{ margin: 0, color: 'var(--primary)', fontWeight: 800 }}>Shakti AI Studio</h3>
-               <div className="gender-selector" style={{ background: '#eee', borderRadius: '20px', padding: '5px', display: 'flex', gap: '5px' }}>
-                 <button className={`gender-btn ${mirrorGender === 'female' ? 'active' : ''}`} onClick={() => setMirrorGender('female')} style={{ padding: '5px 15px', borderRadius: '15px', border: 'none', background: mirrorGender === 'female' ? 'var(--primary)' : 'transparent', color: mirrorGender === 'female' ? 'white' : '#666', fontSize: '0.7rem' }}>Feminino</button>
-                 <button className={`gender-btn ${mirrorGender === 'male' ? 'active' : ''}`} onClick={() => setMirrorGender('male')} style={{ padding: '5px 15px', borderRadius: '15px', border: 'none', background: mirrorGender === 'male' ? 'var(--primary)' : 'transparent', color: mirrorGender === 'male' ? 'white' : '#666', fontSize: '0.7rem' }}>Masculino</button>
-               </div>
-               <X style={{ cursor: 'pointer' }} onClick={() => setIsMirrorOpen(false)} />
-            </div>
-
-            <div className="mirror-studio">
-               <div className="mirror-viewport">
-                  {mirrorStage === 'choosing' && (
-                    <div className="offline-mirror-view" style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', height: '100%', background: '#f5f5f5', color: '#666', textAlign: 'center', padding: '40px' }}>
-                       <div style={{ fontSize: '3rem', marginBottom: '20px' }}>✨</div>
-                       <h4 style={{ color: 'var(--primary)', marginBottom: '10px' }}>Personalize o seu Estilo</h4>
-                       <p style={{ maxWidth: '300px', fontSize: '0.9rem', marginBottom: '30px' }}>Escolha as cores e penteados à direita e depois ligue a câmara para ver a magia.</p>
-                       <button className="btn-primary" onClick={() => setMirrorStage('camera')}>Ligar Minha Câmara</button>
-                    </div>
-                  )}
-
-                  {mirrorStage === 'camera' && (
-                    <>
-                      <video 
-                        ref={videoRef} 
-                        autoPlay 
-                        playsInline 
-                        muted 
-                        style={{ width: '100%', height: '100%', objectFit: 'cover', transform: 'scaleX(-1)' }} 
-                      />
-                      <canvas 
-                        ref={canvasRef}
-                        style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', transform: 'scaleX(-1)', pointerEvents: 'none' }}
-                      />
-                      <div className="mirror-camera-controls" style={{ position: 'absolute', bottom: '30px', left: '0', right: '0', display: 'flex', justifyContent: 'center' }}>
-                         <button className="btn-primary" style={{ padding: '15px 40px', borderRadius: '30px', boxShadow: '0 10px 30px rgba(0,0,0,0.3)', border: 'none' }} onClick={handleGenerateAILook}>📸 Tirar Foto & Aplicar IA</button>
-                      </div>
-                    </>
-                  )}
-
-                  {mirrorStage === 'result' && (
-                    <div className="ai-result-container" style={{ position: 'relative', height: '100%' }}>
-                      <img 
-                        src={capturedPhoto} 
-                        style={{ width: '100%', height: '100%', objectFit: 'cover' }} 
-                        alt="Captured"
-                      />
-                      <canvas 
-                        ref={canvasRef}
-                        style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', pointerEvents: 'none' }}
-                      />
-                      <div className="ai-photo-actions" style={{ position: 'absolute', bottom: '20px', left: '20px', right: '20px', display: 'flex', gap: '10px' }}>
-                        <button className="btn-secondary w-full" style={{ background: 'rgba(255,255,255,0.9)', border: 'none' }} onClick={() => setMirrorStage('camera')}>Refazer Foto</button>
-                        <button className="btn-primary w-full" onClick={() => openBooking({ name: `Look IA - ${mirrorHair}`, category: 'Especial', price: 'Consultar', duration: '60 min', id: 99 })}>Reservar Look</button>
-                      </div>
-                    </div>
-                  )}
-
-                  {isGeneratingLook && (
-                    <div className="ai-processing-overlay">
-                      <div className="processing-spinner"></div>
-                      <p>✨ Shakti AI a processar...</p>
-                    </div>
-                  )}
-               </div>
-
-               <div className="mirror-controls">
-                 {mirrorGender === 'female' ? (
-                   <>
-                     <div className="control-group">
-                       <label style={{ fontWeight: 700, fontSize: '0.8rem' }}>Paleta de Maquilhagem</label>
-                       <div className="color-grid mt-4" style={{ display: 'grid', gridTemplateColumns: 'repeat(5, 1fr)', gap: '10px' }}>
-                         {['#e74c3c', '#c0392b', '#9b59b6', '#f1c40f', '#ecf0f1'].map(c => (
-                           <div key={c} onClick={() => setMirrorColor(c)} style={{ width: '35px', height: '35px', borderRadius: '50%', background: c, cursor: 'pointer', border: mirrorColor === c ? '3px solid var(--primary)' : '1px solid #ddd' }}></div>
-                         ))}
-                       </div>
-                     </div>
-                     <div className="control-group mt-10">
-                       <label style={{ fontWeight: 700, fontSize: '0.8rem' }}>Penteados e Estilos AI</label>
-                       <div className="style-list mt-4">
-                          <button className={`style-btn ${mirrorHair === 'bob' ? 'active' : ''}`} onClick={() => setMirrorHair('bob')}>Short Bob Cut</button>
-                          <button className={`style-btn ${mirrorHair === 'long' ? 'active' : ''}`} onClick={() => setMirrorHair('long')}>Ondas Califórnia</button>
-                          <button className={`style-btn ${mirrorHair === 'pixie' ? 'active' : ''}`} onClick={() => setMirrorHair('pixie')}>Pixie Cut Moderno</button>
-                       </div>
-                     </div>
-                   </>
-                 ) : (
-                   <>
-                     <div className="control-group">
-                        <label style={{ fontWeight: 700, fontSize: '0.8rem' }}>Barba e Contorno AI</label>
-                        <div className="style-list mt-4">
-                           <button className={`style-btn ${mirrorHair === 'stubble' ? 'active' : ''}`} onClick={() => setMirrorHair('stubble')}>Barba de 3 dias</button>
-                           <button className={`style-btn ${mirrorHair === 'full_beard' ? 'active' : ''}`} onClick={() => setMirrorHair('full_beard')}>Barba Viking (Cheia)</button>
-                           <button className={`style-btn ${mirrorHair === 'cavanque' ? 'active' : ''}`} onClick={() => setMirrorHair('cavanque')}>Cavanque Estilo</button>
-                        </div>
-                     </div>
-                     <div className="control-group mt-10">
-                        <label style={{ fontWeight: 700, fontSize: '0.8rem' }}>Cortes e Finalização</label>
-                        <div className="style-list mt-4">
-                           <button className={`style-btn ${mirrorHair === 'fade' ? 'active' : ''}`} onClick={() => setMirrorHair('fade')}>High Fade (Degradê)</button>
-                           <button className={`style-btn ${mirrorHair === 'buzz' ? 'active' : ''}`} onClick={() => setMirrorHair('buzz')}>Buzz Cut (Rapado)</button>
-                           <button className={`style-btn ${mirrorHair === 'pompadour' ? 'active' : ''}`} onClick={() => setMirrorHair('pompadour')}>Pompadour Moderno</button>
-                        </div>
-                     </div>
-                   </>
-                 )}
-                 <div style={{ marginTop: '20px', padding: '15px', background: 'rgba(45, 90, 39, 0.05)', borderRadius: '15px' }}>
-                    <p style={{ fontSize: '0.7rem', margin: 0, opacity: 0.7 }}>Passo Atual:</p>
-                    <p style={{ fontSize: '0.9rem', fontWeight: 700, color: 'var(--primary)', margin: 0 }}>
-                       {mirrorStage === 'choosing' ? '1. Definir Estilo' : mirrorStage === 'camera' ? '2. Captura Facial' : '3. Resultado Final'}
-                    </p>
-                 </div>
-                </div>
-            </div>
-          </div>
-        </div>
-      )}
-      {/* Navigation */}
-      <nav className={`navbar ${scrolled ? 'nav-scrolled' : ''}`}>
-        <div className="container nav-content">
-          <div className="logo">SHAKTI<span>HOME</span></div>
-          <div className="nav-links">
-            <a href="#services">Serviços</a>
-            <a href="#about">Sobre nós</a>
-            <a href="#contact">Contactos</a>
-            <button className="btn-primary" onClick={() => openBooking()}>Reservar Agora</button>
-          </div>
-          <button className="mobile-menu-btn"><Menu /></button>
-        </div>
-      </nav>
-
-      {/* Hero Section */}
-      <header className="hero">
-        <div className="hero-overlay"></div>
-        <div className="hero-content container animate">
-          <span className="hero-tag">Apúlia Coast Wellness</span>
-          <h1>Equilíbrio entre corpo, mente e alma.</h1>
-          <p>Um refúgio de serenidade onde a tradição Ayurveda encontra a estética moderna.</p>
-          <div className="hero-btns">
-            <button className="btn-primary" onClick={() => openBooking()}>Agendar Tratamento</button>
-            <button className="btn-secondary" onClick={() => setIsMirrorOpen(true)}>✨ Look Virtual (AI)</button>
-          </div>
-        </div>
-      </header>
-
-      {/* Services Section */}
-      <section id="services" className="services container">
-        <div className="section-head">
-          <h2>Nossos Serviços</h2>
-          <p>Escolha o tratamento ideal para o seu momento.</p>
-        </div>
-        <div className="services-grid">
-          {services.map(service => (
-            <div key={service.id} className="service-card animate">
-              <div className="service-info">
-                <span className="category">{service.category}</span>
-                <h3>{service.name}</h3>
-                <div className="service-meta">
-                  <span><Clock size={16} /> {service.duration}</span>
-                  <span>{service.price}</span>
-                </div>
-              </div>
-              <button className="btn-icon" onClick={() => openBooking(service)}>
-                <ChevronRight />
-              </button>
-            </div>
-          ))}
-        </div>
-      </section>
-
-      {/* About Section */}
-      <section id="about" className="about section-spacing">
-        <div className="container about-grid">
-          <div className="about-image animate">
-            <div className="image-stack">
-              <img src="https://images.unsplash.com/photo-1544161515-436cead21ef9?auto=format&fit=crop&q=80&w=1000" alt="Ayurveda Treatment" className="img-large" />
-              <div className="image-accent"></div>
-            </div>
-          </div>
-          <div className="about-text animate">
-            <span className="category">A Nossa Essência</span>
-            <h2>O Seu Refúgio de Bem-Estar na Costa de Apúlia</h2>
-            <p>
-              Na Shakti Home, acreditamos no equilíbrio holístico. Situados na belíssima vila de Apúlia, combinamos técnicas ancestrais de Ayurveda com as tendências modernas de estética e bem-estar.
-            </p>
-            <p>
-              O nosso espaço foi concebido como um santuário de serenidade, onde cada detalhe é pensado para proporcionar uma experiência de calma e rejuvenescimento total.
-            </p>
-            <div className="about-stats">
-              <div className="stat-item">
-                <strong>10+</strong>
-                <span>Anos de Experiência</span>
-              </div>
-              <div className="stat-item">
-                <strong>500+</strong>
-                <span>Clientes Felizes</span>
-              </div>
-            </div>
-          </div>
-        </div>
-      </section>
-
-      {/* Contact Section */}
-      <section id="contact" className="contact section-spacing bg-light">
-        <div className="container">
-          <div className="section-head">
-            <span className="category">Dúvidas ou Sugestões?</span>
-            <h2>Entre em Contacto</h2>
-          </div>
-          
-          <div className="contact-wrapper">
-            <div className="contact-info animate">
-              <div className="contact-card">
-                <div className="icon-box"><MapPin /></div>
-                <div>
-                  <h4>Onde Estamos</h4>
-                  <p>Av. da Praia 44, Apúlia, Portugal</p>
-                </div>
-              </div>
-              
-              <div className="contact-card">
-                <div className="icon-box"><Phone /></div>
-                <div>
-                  <h4>Telefone</h4>
-                  <p>+351 912 345 678</p>
-                </div>
-              </div>
-              
-              <div className="contact-card">
-                <div className="icon-box"><Mail /></div>
-                <div>
-                  <h4>Email</h4>
-                  <p>geral@shaktihome.pt</p>
-                </div>
-              </div>
-              
-              <div className="contact-card">
-                <div className="icon-box"><Clock /></div>
-                <div>
-                  <h4>Horário</h4>
-                  <p>Seg - Sáb: 09:00 - 19:00</p>
-                </div>
-              </div>
-            </div>
-
-            <form className="contact-form animate" onSubmit={handleContactSubmit}>
-              <div className="form-row">
-                <div className="form-group">
-                  <label>Nome</label>
-                  <input 
-                    type="text" 
-                    placeholder="Seu nome" 
-                    className="input-field" 
-                    value={contactForm.name}
-                    onChange={(e) => setContactForm(prev => ({ ...prev, name: e.target.value }))}
-                    required
-                  />
-                </div>
-                <div className="form-group">
-                  <label>Email</label>
-                  <input 
-                    type="email" 
-                    placeholder="seu@email.com" 
-                    className="input-field" 
-                    value={contactForm.email}
-                    onChange={(e) => setContactForm(prev => ({ ...prev, email: e.target.value }))}
-                    required
-                  />
-                </div>
-              </div>
-              <div className="form-group">
-                <label>Assunto</label>
-                <select 
-                  className="input-field" 
-                  value={contactForm.subject}
-                  onChange={(e) => setContactForm(prev => ({ ...prev, subject: e.target.value }))}
-                >
-                  <option>Informações Gerais</option>
-                  <option>Marcação de Grupo</option>
-                  <option>Eventos & Parcerias</option>
-                </select>
-              </div>
-              <div className="form-group">
-                <label>Mensagem</label>
-                <textarea 
-                  placeholder="Como podemos ajudar?" 
-                  className="input-field" 
-                  rows="4"
-                  value={contactForm.message}
-                  onChange={(e) => setContactForm(prev => ({ ...prev, message: e.target.value }))}
-                  required
-                ></textarea>
-              </div>
-              <button 
-                type="submit" 
-                className="btn-primary w-full"
-                disabled={isSubmitting}
-              >
-                {isSubmitting ? 'A enviar...' : 'Enviar Mensagem'}
-              </button>
-            </form>
-          </div>
-        </div>
-      </section>
-
-      {/* Booking Modal */}
-      {isBookingOpen && (
-        <div className="modal-overlay">
-          <div className="modal-content animate">
-            <button className="close-btn" onClick={() => setIsBookingOpen(false)}><X /></button>
-            
-            <div className="booking-stepper">
-              <div className={`step ${bookingStep >= 1 ? 'active' : ''}`}>1</div>
-              <div className="step-line"></div>
-              <div className={`step ${bookingStep >= 2 ? 'active' : ''}`}>2</div>
-              <div className="step-line"></div>
-              <div className={`step ${bookingStep >= 3 ? 'active' : ''}`}>3</div>
-            </div>
-
-            {bookingStep === 1 && (
-              <div className="step-content">
-                <h3>Escolha o Serviço</h3>
-                <div className="selection-list">
-                  {services.map(s => (
-                    <div 
-                      key={s.id} 
-                      className={`selection-item ${selectedService?.id === s.id ? 'selected' : ''}`}
-                      onClick={() => setSelectedService(s)}
-                    >
-                      <div>
-                        <strong>{s.name}</strong>
-                        <p>{s.category} • {s.duration}</p>
-                      </div>
-                      <span>{s.price}</span>
-                    </div>
-                  ))}
-                </div>
-                <button className="btn-primary w-full mt-4" disabled={!selectedService} onClick={nextStep}>
-                  Continuar
-                </button>
-              </div>
-            )}
-
-            {bookingStep === 2 && (
-              <div className="step-content">
-                <h3>Data e Hora</h3>
-                <div className="calendar-selection">
-                  <div className="date-input-wrapper">
-                    <label>Selecione o Dia:</label>
-                    <input 
-                      type="date" 
-                      className="input-field"
-                      min={new Date().toISOString().split('T')[0]}
-                      value={formData.date}
-                      onChange={(e) => setFormData(prev => ({ ...prev, date: e.target.value, time: '' }))}
-                    />
-                  </div>
-                  <p className="mt-4">Horários Disponíveis:</p>
-                  <div className="time-grid">
-                    {timeSlots.map(t => {
-                      const isBusy = busySlots.includes(t);
-                      return (
-                        <button 
-                          key={t} 
-                          disabled={isBusy}
-                          className={`time-btn ${formData.time === t ? 'selected' : ''} ${isBusy ? 'busy' : ''}`}
-                          onClick={() => setFormData(prev => ({ ...prev, time: t }))}
-                        >
-                          {t}
-                          {isBusy && <span className="busy-tag">Ocupado</span>}
-                        </button>
-                      );
-                    })}
-                  </div>
-                </div>
-                <div className="modal-footer">
-                  <button className="btn-secondary" onClick={prevStep}>Voltar</button>
-                  <button className="btn-primary" disabled={!formData.time} onClick={nextStep}>Confirmar Data</button>
-                </div>
-              </div>
-            )}
-
-            {bookingStep === 3 && (
-              <div className="step-content text-center">
-                <CheckCircle2 size={64} className="success-icon" />
-                <h3>Dados de Contacto</h3>
-                <p>Quase lá! Insira os seus dados para confirmarmos o agendamento.</p>
-                <div className="form-group mt-4 text-left">
-                  <label>Nome Completo</label>
-                  <input 
-                    type="text" 
-                    name="name"
-                    value={formData.name}
-                    onChange={handleInputChange}
-                    placeholder="Seu nome" 
-                    className="input-field" 
-                  />
-                  <label>Email</label>
-                  <input 
-                    type="email" 
-                    name="email"
-                    value={formData.email}
-                    onChange={handleInputChange}
-                    placeholder="seu@email.com" 
-                    className="input-field" 
-                  />
-                   <input 
-                    type="tel" 
-                    name="phone"
-                    value={formData.phone}
-                    onChange={handleInputChange}
-                    placeholder="+351 9xx xxx xxx" 
-                    className="input-field" 
-                  />
-                  
-                  <div className="voucher-section mt-4" style={{ background: 'rgba(45, 90, 39, 0.05)', padding: '15px', borderRadius: '10px' }}>
-                    <label style={{ fontSize: '0.8rem', fontWeight: 600 }}>Tem um Voucher de Desconto?</label>
-                    <div style={{ display: 'flex', gap: '10px', marginTop: '5px' }}>
-                      <input 
-                        type="text" 
-                        placeholder="Ex: FLASH-XXXX" 
-                        className="input-field" 
-                        style={{ margin: 0, textTransform: 'uppercase' }}
-                        value={promoCode}
-                        onChange={(e) => setPromoCode(e.target.value.toUpperCase())}
-                      />
-                      <button className="btn-secondary" style={{ padding: '0 15px' }} onClick={validateVoucher}>Validar</button>
-                    </div>
-                    {discountPercent > 0 && (
-                      <p style={{ color: '#2d5a27', fontSize: '0.8rem', marginTop: '5px', fontWeight: 700 }}>
-                        <CheckCircle2 size={14} style={{ verticalAlign: 'middle' }} /> {discountPercent}% de desconto aplicado!
-                      </p>
-                   )}
-                  </div>
-                </div>
-                <div style={{ padding: '15px', borderTop: '1px solid #eee', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                  <div style={{ textAlign: 'left' }}>
-                    <p style={{ fontSize: '0.8rem', opacity: 0.6, margin: 0 }}>Valor Total</p>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                      <p style={{ fontSize: '1.4rem', fontWeight: 700, margin: 0, 
-                        textDecoration: discountPercent > 0 ? 'line-through' : 'none', 
-                        opacity: discountPercent > 0 ? 0.3 : 1 }}>
-                        {selectedService?.price}
-                      </p>
-                      {discountPercent > 0 && (
-                        <p style={{ fontSize: '1.4rem', fontWeight: 700, margin: 0, color: '#2d5a27' }}>
-                          {(parseFloat(selectedService.price) * (1 - discountPercent/100)).toFixed(2)}€
-                        </p>
-                      )}
-                    </div>
-                  </div>
-                  <button 
-                    className="btn-primary" 
-                    style={{ width: 'auto', padding: '12px 30px' }}
-                    disabled={isSubmitting || !formData.name || !formData.email} 
-                    onClick={handleBookingSubmit}
-                  >
-                    {isSubmitting ? 'A processar...' : 'Confirmar Reserva'}
-                  </button>
-                </div>
-              </div>
-            )}
-          </div>
-        </div>
-      )}
-
-      {/* Footer */}
-      <footer className="footer">
-        <div className="container footer-content">
-          <div className="footer-brand">
-            <div className="logo white">SHAKTI<span>HOME</span></div>
-            <p>O seu espaço de bem-estar em Apúlia.</p>
-          </div>
-          <div className="footer-info">
-            <div className="info-item"><MapPin size={18} /> Av. da Praia 44, Apúlia</div>
-            <div className="info-item"><Phone size={18} /> +351 912 345 678</div>
-          </div>
-          <div className="footer-social">
-            <Instagram />
-            <Facebook />
-          </div>
-        </div>
-        <div className="footer-bottom">
-          <p>© 2026 Shakti Home. Todos os direitos reservados.</p>
-          <button className="admin-access-btn" onClick={() => setView('admin')}>Admin Portal</button>
-        </div>
-      </footer>
-
-      {/* Toast Portal */}
-      <div className="toast-container">
-        {toasts.map(t => (
-          <div key={t.id} className={`toast ${t.type}`}>
-            {t.type === 'success' && <CheckCircle2 size={24} color="#10b981" />}
-            {t.type === 'error' && <AlertTriangle size={24} color="#ef4444" />}
-            {t.type === 'info' && <Info size={24} color="#3b82f6" />}
-            <div className="toast-content">
-              <span className="toast-title">{t.title}</span>
-              <p className="toast-message">{t.message}</p>
-            </div>
-            <X size={16} style={{ cursor: 'pointer', opacity: 0.5 }} onClick={() => setToasts(prev => prev.filter(x => x.id !== t.id))} />
-          </div>
-        ))}
-      </div>
+        <Hero 
+          scrolled={scrolled} 
+          onBooking={openBooking} 
+          onMirror={setIsMirrorOpen} 
+        />
+        
+        <ServicesPage 
+          services={services} 
+          onBooking={openBooking} 
+        />
+        
+        <About />
+        
+        <Contact 
+          contactForm={contactForm} 
+          setContactForm={setContactForm} 
+          handleContactSubmit={handleContactSubmit} 
+          isSubmitting={isSubmitting} 
+        />
+        
+        <Footer 
+          onAdminLogin={() => setView('admin')} 
+        />
+        
+        <AIMirrorModal onBooking={openBooking} />
+        <BookingModal 
+          isOpen={isBookingOpen} 
+          onClose={() => setIsBookingOpen(false)} 
+          services={services} 
+          technicians={technicians} 
+          timeSlots={timeSlots} 
+          bookingForm={bookingForm} 
+          setBookingForm={setBookingForm} 
+          bookingStep={bookingStep} 
+          setBookingStep={setBookingStep} 
+          handleBookingSubmit={handleBookingSubmit} 
+          isSubmitting={isSubmitting} 
+        />
       </div>
     )}
+    <ToastContainer toasts={toasts} onRemove={(id) => setToasts(prev => prev.filter(t => t.id !== id))} />
   </div>
   );
 }

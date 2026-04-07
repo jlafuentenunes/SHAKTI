@@ -84,6 +84,7 @@ async function initDB() {
         duration VARCHAR(50),
         price VARCHAR(50),
         category VARCHAR(100),
+        image_url VARCHAR(512),
         technician_id INT DEFAULT NULL,
         checklist JSON DEFAULT NULL,
         promo_discount INT DEFAULT 10,
@@ -98,13 +99,13 @@ async function initDB() {
     const [existingServices] = await connection.query('SELECT count(*) as count FROM services');
     if (existingServices[0].count === 0) {
       const initialServices = [
-        { name: 'Ayurveda Abhyanga', duration: '60 min', price: '65€', category: 'Massagens', technician_id: 1, checklist: JSON.stringify(['Óleo de Sésamo Quente', 'Massagem de 7 posições', 'Toalhas Quentes']) },
-        { name: 'Corte & Styling', duration: '45 min', price: '35€', category: 'Cabeleireiro', technician_id: 2, checklist: JSON.stringify(['Lavagem com Kérastase', 'Corte Precision', 'Finalização com Secador']) },
-        { name: 'Manicure Gelinho', duration: '60 min', price: '25€', category: 'Unhas', technician_id: 3, checklist: JSON.stringify(['Limpeza de Cutículas', 'Base de Queratina', 'Cor 2 Camadas', 'Óleo de Cutículas']) },
-        { name: 'Terapia Xamânica', duration: '90 min', price: '80€', category: 'Terapias', technician_id: 4, checklist: JSON.stringify(['Defumação de Sálvia', 'Leitura de Energias', 'Alinhamento de Chacras']) }
+        { name: 'Ayurveda Abhyanga', duration: '60 min', price: '65€', category: 'Massagens', image_url: 'https://images.unsplash.com/photo-1544161515-4af6b1d8e1a9?auto=format&fit=crop&q=80&w=800', technician_id: 1, checklist: JSON.stringify(['Óleo de Sésamo Quente', 'Massagem de 7 posições', 'Toalhas Quentes']) },
+        { name: 'Corte & Styling', duration: '45 min', price: '35€', category: 'Cabeleireiro', image_url: 'https://images.unsplash.com/photo-1562322140-8baeececf3df?auto=format&fit=crop&q=80&w=800', technician_id: 2, checklist: JSON.stringify(['Lavagem com Kérastase', 'Corte Precision', 'Finalização com Secador']) },
+        { name: 'Manicure Gelinho', duration: '60 min', price: '25€', category: 'Unhas', image_url: 'https://images.unsplash.com/photo-1604654894611-6973b376cbde?auto=format&fit=crop&q=80&w=800', technician_id: 3, checklist: JSON.stringify(['Limpeza de Cutículas', 'Base de Queratina', 'Cor 2 Camadas', 'Óleo de Cutículas']) },
+        { name: 'Terapia Xamânica', duration: '90 min', price: '80€', category: 'Terapias', image_url: 'https://images.unsplash.com/photo-1515377905703-c4788e51af15?auto=format&fit=crop&q=80&w=800', technician_id: 4, checklist: JSON.stringify(['Defumação de Sálvia', 'Leitura de Energias', 'Alinhamento de Chacras']) }
       ];
       for (const s of initialServices) {
-        await connection.execute('INSERT INTO services (name, duration, price, category, technician_id, checklist) VALUES (?, ?, ?, ?, ?, ?)', [s.name, s.duration, s.price, s.category, s.technician_id, s.checklist]);
+        await connection.execute('INSERT INTO services (name, duration, price, category, image_url, technician_id, checklist) VALUES (?, ?, ?, ?, ?, ?, ?)', [s.name, s.duration, s.price, s.category, s.image_url, s.technician_id, s.checklist]);
       }
     }
 
@@ -694,7 +695,7 @@ app.post('/api/bookings/:id/promote', async (req, res) => {
           <h1 style="background: #2d5a27; color: white; display: inline-block; padding: 12px 25px; border-radius: 8px; letter-spacing: 2px;">${vCode}</h1>
         </div>
         <p style="text-align: center; margin-top: 20px;">
-          <a href="https://counter-mic-launched-informal.trycloudflare.com" 
+          <a href="https://empirical-enhanced-vip-hawaiian.trycloudflare.com" 
              style="background: #e4c59e; color: #2d5a27; padding: 10px 20px; text-decoration: none; border-radius: 5px; font-weight: bold;">Reservar Já</a>
         </p>
       </div>
@@ -799,8 +800,7 @@ app.post('/api/vouchers/promote-empty', async (req, res) => {
           <p style="font-size: 0.8rem; color: #999; margin-top: 10px;">*Válido apenas nos próximos ${validityMin} minutos!</p>
         </div>
         <p style="text-align: center; margin-top: 25px;">
-          <a href="https://counter-mic-launched-informal.trycloudflare.com" 
-             style="background: #e4c59e; color: #2d5a27; padding: 12px 30px; text-decoration: none; border-radius: 8px; font-weight: bold; border: 1px solid #2d5a27;">Agendar Agora</a>
+            <a href="https://empirical-enhanced-vip-hawaiian.trycloudflare.com" style="background: #2d5a27; color: white; padding: 12px 25px; text-decoration: none; border-radius: 8px; font-weight: bold; display: inline-block;">Marcar Outro Tratamento</a>
         </p>
       </div>
     `;
